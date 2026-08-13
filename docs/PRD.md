@@ -29,7 +29,7 @@ Out: cascade prediction, OpenTelemetry, digital twin, ESA-ADB as build data, phy
 Stage One (pass/fail): Gemini 3.5 via Vertex AI, ADK, GCP services, GCP deployment proof in video, repo, architecture diagram, README spin-up, ~4-min video.
 Stage Two: autonomous multi-step completion with no human intervention (40%); decoupling, state management, scoped tools, failure handling (30%); unedited live execution with visible logs and database writes (30%).
 Product: end-to-end run on OPSSAT-AD with at least one verifier rejection and one correct escalation, measured against ground-truth labels.
-Evaluation integrity: report the benchmark's own 7 metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on the published 1494/529 split, led by MCC and AUC-PR given ~20% class imbalance. Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
+Evaluation integrity: report the benchmark's own 7 metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on the published 1594/529 split, led by MCC and AUC-PR given ~20% class imbalance. Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
 
 **6. Constraints**
 

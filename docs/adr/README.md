@@ -14,4 +14,5 @@
 | [ADR-010](ADR-010.md) | Scope cuts | Accepted |
 | [ADR-011](ADR-011.md) | Two-topic split-queue over single push chain | Accepted |
 | [ADR-012](ADR-012.md) | Detector composition | Accepted |
-| [ADR-013](ADR-013.md) | Orchestration is an ADK 2 graph workflow (Pillar 1) | Draft |
+| [ADR-013](ADR-013.md) | Orchestration is an ADK 2 graph workflow (Pillar 1) | Accepted |
+| [ADR-014](ADR-014.md) | Retry policy | Accepted |
