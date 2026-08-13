@@ -5,6 +5,7 @@ pandas
 scikit-learn
 torch
 pyod
+requests
 
 # --- aksha_agent (graph, llm, infra, dashboard) ---
 google-adk==2.3.0
