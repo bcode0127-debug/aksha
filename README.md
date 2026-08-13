@@ -6,6 +6,8 @@ Anomaly detection for spacecraft telemetry, with conformal-calibrated confidence
 
 _Placeholder: diagram generated from `Workflow.graph.edges`._
 
+Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
+
 ## Spin-up
 
 _Placeholder._
