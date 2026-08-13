@@ -1,0 +1,10 @@
+# --- aksha_core (detectors, conformal calibration, data, utils) ---
+# No google/ADK/vertexai imports allowed in this section's consumers — see CLAUDE.md.
+numpy
+pandas
+scikit-learn
+torch
+pyod
+
+# --- aksha_agent (graph, llm, infra, dashboard) ---
+google-adk==2.3.0
