@@ -1,82 +1,38 @@
-# Byte-compiled / optimized / DLL files
+# --- Python ---
 __pycache__/
 *.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# Environments
-.env
 .venv/
-env/
 venv/
-ENV/
-env.bak/
-venv.bak/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
 
-# IDE
-.vscode/
-.idea/
+# --- Secrets ---
+# Never a blanket *.json — config JSON stays tracked.
+.env
+.streamlit/secrets.toml
+*-service-account*.json
+*credentials*.json
+sa-key*.json
 
-# OS
+# --- macOS ---
 .DS_Store
 
-# Project data
-data/
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- Data ---
+# Dataset is reproduced by the fetch script, not committed. Anchored to repo
+# root (leading slash) so this doesn't also match aksha_core/data/, a real
+# Python subpackage. Ignore contents (data/*) rather than the dir itself, so
+# the !gitkeep negation below can actually take effect.
+/data/*
+!/data/.gitkeep
+
+# --- Artifacts ---
+# Explicitly NOT ignored: trained artifacts (fitted IForest + conformal
+# calibration) are committed on purpose so a clone runs without training.
+
+# --- Eval outputs ---
+eval/outputs/*
+!eval/outputs/.gitkeep
