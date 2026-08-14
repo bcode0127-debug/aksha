@@ -11,6 +11,10 @@ Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
 ## Spin-up
 
 1. `python3 scripts/fetch_data.py` — downloads `dataset.csv` and `segments.csv` (OPSSAT-AD) into `data/`, checksum-verified.
+2. Enable the required GCP APIs:
+   ```
+   gcloud services enable run.googleapis.com pubsub.googleapis.com firestore.googleapis.com aiplatform.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com billingbudgets.googleapis.com
+   ```
 
 _Remaining steps: placeholder._
 
