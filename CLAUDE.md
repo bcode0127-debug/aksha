@@ -27,6 +27,9 @@ the change, not the ticket.
   bumped — minor versions have changed agent/tool call signatures before.
 - `ADK_MODEL` must be Gemini 3.5 or newer. The ADK tutorial defaults (older Gemini models) fail
   Stage One of the pipeline — do not use them, even for local smoke tests.
+- Use `GOOGLE_GENAI_USE_ENTERPRISE=True` to route through Vertex/Enterprise. `GOOGLE_GENAI_USE_VERTEXAI`
+  is deprecated in `google-adk` 2.3.0 — tutorials and older docs still use it, do not copy that
+  name in. Re-verify on any version bump.
 
 ## Naming
 
