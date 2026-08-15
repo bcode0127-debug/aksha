@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+google-cloud-firestore
+google-adk==2.3.0

@@ -9,3 +9,7 @@ requests
 
 # --- aksha_agent (graph, llm, infra, dashboard) ---
 google-adk==2.3.0
+fastapi
+uvicorn[standard]
+google-cloud-firestore
+google-cloud-pubsub
