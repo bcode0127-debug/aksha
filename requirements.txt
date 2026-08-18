@@ -2,9 +2,11 @@
 # No google/ADK/vertexai imports allowed in this section's consumers — see CLAUDE.md.
 numpy
 pandas
+scipy
 scikit-learn
 torch
 pyod
+pyarrow
 requests
 
 # --- aksha_agent (graph, llm, infra, dashboard) ---
