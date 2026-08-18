@@ -1,8 +1,16 @@
 """Detector service — fast path.
 
-Receives a Pub/Sub push envelope on `telemetry-in`, emits a stub
-DetectionResult (no real detection yet), writes it to Firestore, and
-republishes it to `triage`. See TRD section 1 and 5.
+Receives a Pub/Sub push envelope on `telemetry-in`, scores the window with the
+committed Isolation Forest + split conformal artifact, writes the
+DetectionResult to Firestore, and republishes it to `triage`. See TRD sections
+1 and 5.
+
+The artifact is loaded once at cold start, not per request: it is ~1.8 MB and
+unpickling it on every push would dominate the fast path's latency budget.
+
+`conformal_p` is a conformal p-value — LOW means anomalous. See
+`aksha_core.conformal.split` for the direction and the guarantee. Anything
+downstream that reads this field must not treat it as an anomaly confidence.
 """
 from __future__ import annotations
 
@@ -15,11 +23,12 @@ import os
 from fastapi import FastAPI, Request, Response
 from google.cloud import firestore, pubsub_v1
 
+from aksha_core.detectors.artifact import DetectorArtifact
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("detector_service")
 
 PROJECT_ID = os.environ["GOOGLE_CLOUD_PROJECT"]
-DETECTOR_VERSION = "stub-0.0.1"
 TRIAGE_TOPIC = "triage"
 
 app = FastAPI()
@@ -27,9 +36,26 @@ db = firestore.Client(project=PROJECT_ID)
 publisher = pubsub_v1.PublisherClient()
 triage_topic_path = publisher.topic_path(PROJECT_ID, TRIAGE_TOPIC)
 
+# Cold-start load. A failure here should kill the container rather than let it
+# serve 204s without scoring anything.
+ARTIFACT = DetectorArtifact.load()
+DETECTOR_VERSION = ARTIFACT.detector_version
+logger.info(
+    "loaded detector %s: %d features, %d calibration windows, threshold %.6f",
+    DETECTOR_VERSION,
+    len(ARTIFACT.feature_columns),
+    ARTIFACT.calibrator.n,
+    ARTIFACT.threshold(),
+)
 
-def score_stub(fragment: dict) -> dict:
-    """No real detection yet — fixed stub scores, proves the pipeline shape."""
+
+def score_window(fragment: dict) -> dict:
+    """Score one window. Raises ValueError if the feature vector is incomplete.
+
+    No defaulting of absent features: a DetectionResult assembled from a
+    partial vector would carry a number that looks like a score and is not one.
+    """
+    scored = ARTIFACT.score_features(fragment.get("features") or {})
     return {
         "fragment_id": fragment["fragment_id"],
         "channel_id": fragment["channel_id"],
@@ -37,10 +63,11 @@ def score_stub(fragment: dict) -> dict:
         "t_end": fragment["t_end"],
         "features": fragment.get("features", {}),
         "context": fragment.get("context", {}),
-        "score": 0.9,
-        "threshold": 0.85,
-        "conformal_p": 0.9,
-        "detector_version": DETECTOR_VERSION,
+        "score": scored["score"],
+        "threshold": scored["threshold"],
+        "conformal_p": scored["conformal_p"],
+        "is_anomalous": scored["score"] >= scored["threshold"],
+        "detector_version": scored["detector_version"],
     }
 
 
@@ -67,9 +94,22 @@ async def handle_push(request: Request) -> Response:
         detection = {k: v for k, v in snapshot.to_dict().items() if k != "published"}
         logger.info("detection %s exists but unpublished, retrying publish", idempotency_key)
     else:
-        detection = score_stub(fragment)
+        try:
+            detection = score_window(fragment)
+        except ValueError as exc:
+            # Permanent, not transient: redelivering the same malformed message
+            # will fail identically. 400 lets Pub/Sub exhaust its attempts and
+            # dead-letter it rather than retrying forever.
+            logger.error("cannot score %s: %s", idempotency_key, exc)
+            return Response(status_code=400)
         doc_ref.set({**detection, "published": False})
-        logger.info("wrote detection %s (published=False)", idempotency_key)
+        logger.info(
+            "wrote detection %s (published=False) score=%.6f conformal_p=%.6g anomalous=%s",
+            idempotency_key,
+            detection["score"],
+            detection["conformal_p"],
+            detection["is_anomalous"],
+        )
 
     future = publisher.publish(triage_topic_path, json.dumps(detection).encode("utf-8"))
     # future.result() blocks; run it off the event loop instead of freezing other requests.

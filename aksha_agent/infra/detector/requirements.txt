@@ -2,3 +2,14 @@ fastapi
 uvicorn[standard]
 google-cloud-firestore
 google-cloud-pubsub
+# --- aksha_core detector dependencies ---
+# PINNED to the versions the committed artifact was fitted against. scikit-learn
+# warns that unpickling a model across versions "may lead to breaking code or
+# invalid results"; numpy and pyod can change results with no warning at all.
+# Re-pin here whenever scripts/train_detector.py is re-run on a new stack.
+numpy==2.4.6
+scipy==1.17.1
+scikit-learn==1.8.0
+pyod==3.6.5
+joblib==1.5.3
+pandas
