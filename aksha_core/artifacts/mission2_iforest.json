@@ -1,0 +1,59 @@
+{
+  "detector_version": "iforest-conformal-0.1.0",
+  "feature_columns": [
+    "sample_count",
+    "total_gap_seconds",
+    "max_gap_seconds",
+    "gap_fraction",
+    "mean",
+    "std",
+    "var",
+    "skew",
+    "kurtosis",
+    "min",
+    "max",
+    "mean_abs_change",
+    "n_peaks",
+    "smooth_n_peaks",
+    "diff_peaks",
+    "diff_var",
+    "diff2_peaks",
+    "diff2_var",
+    "slope",
+    "mahalanobis",
+    "seconds_since_last_tc",
+    "tc_count_in_window"
+  ],
+  "n_features": 22,
+  "impute_values": {
+    "seconds_since_last_tc": 811.711
+  },
+  "n_train_rows": 137235,
+  "n_calibration_rows": 23970,
+  "model_params": {
+    "contamination": 0.01,
+    "n_estimators": 200,
+    "random_state": 20260818
+  },
+  "epsilon": 0.01,
+  "threshold_table": {
+    "0.05": -0.07510968303938803,
+    "0.02": -0.04778261758362046,
+    "0.01": -0.011820485679923998,
+    "0.005": 0.06198346804973576,
+    "0.001": 0.08674432022170031
+  },
+  "conformal_p_direction": "low = anomalous",
+  "fitted_with": {
+    "scikit-learn": "1.8.0",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "pyod": "3.6.5",
+    "joblib": "1.5.3"
+  },
+  "written_utc": "2026-08-18T14:01:30.149908+00:00",
+  "source_parquet": "data/processed/mission2_features.parquet",
+  "fit_seconds": 1.15,
+  "train_rows": 137235,
+  "calibration_rows": 23970
+}
