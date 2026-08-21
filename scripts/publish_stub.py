@@ -9,8 +9,9 @@ The two built-in windows are REAL rows from the Mission2 test split, not
 invented numbers, so the score the service returns is a real score. Their
 offline values (detector iforest-conformal-0.1.0) are:
 
-    nominal  channel_21  score -0.155409  conformal_p 0.443578   -> not flagged
-    anomaly  channel_20  score +0.103404  conformal_p 0.000626   -> flagged
+    nominal     channel_21  score -0.155409  conformal_p 0.443578   -> not flagged
+    anomaly     channel_20  score +0.103404  conformal_p 0.000626   -> flagged
+    rare_event  channel_23  score +0.098887  conformal_p 0.000751   -> flagged
 
 The full 22-feature vector is required; the service rejects a partial one with
 400 rather than scoring a half-empty window.
@@ -87,6 +88,35 @@ WINDOWS = {
             "mahalanobis": 1.4051890013379187,
             "seconds_since_last_tc": 522.864,
             "tc_count_in_window": 67.0
+        }
+    },
+    "rare_event": {
+        "channel_id": "channel_23",
+        "window_start": "2003-01-26T18:00:00Z",
+        "window_end": "2003-01-26T19:00:00Z",
+        "features": {
+            "sample_count": 240.0,
+            "total_gap_seconds": 0.0,
+            "max_gap_seconds": 18.003,
+            "gap_fraction": 0.0,
+            "mean": 0.858165335953,
+            "std": 0.018304836934,
+            "var": 0.000335067055,
+            "skew": -0.218338667857,
+            "kurtosis": -1.814408226672,
+            "min": 0.834005355835,
+            "max": 0.876851081848,
+            "mean_abs_change": 0.000236438447,
+            "n_peaks": 4.0,
+            "smooth_n_peaks": 3.0,
+            "diff_peaks": 34.0,
+            "diff_var": 8.45854e-07,
+            "diff2_peaks": 43.0,
+            "diff2_var": 1.777144e-06,
+            "slope": 0.000289560951,
+            "mahalanobis": 1.779164485358,
+            "seconds_since_last_tc": 516.312,
+            "tc_count_in_window": 63.0
         }
     }
 }
