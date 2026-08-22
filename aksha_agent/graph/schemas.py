@@ -34,9 +34,21 @@ class HypothesisKind(str, Enum):
 
 
 class VerifierStatus(str, Enum):
-    CONFIRM = "confirm"
-    REJECT = "reject"
-    DISPUTED = "disputed"
+    """The verifier's adjudication: genuine fault, or expected operation?
+
+    These do NOT mean "the hypothesis is supported / contradicted". Asking
+    whether the evidence supports the hypothesis makes the verifier unable to
+    discriminate: a rare-but-expected event IS statistically deviant, so
+    "supported" is the correct answer for it too, and everything gets confirmed.
+
+    The verifier instead decides what the window IS — a fault that operators
+    should act on, or unusual-but-expected behaviour that they should not be
+    woken for.
+    """
+
+    CONFIRM = "confirm"      # a genuine fault: something is wrong with the spacecraft
+    REJECT = "reject"        # unusual but expected operation, not a fault
+    DISPUTED = "disputed"    # the evidence does not settle it either way
 
 
 class Severity(str, Enum):
@@ -117,9 +129,25 @@ class InvestigateInput(BaseModel):
 
 
 class InvestigateOutput(BaseModel):
-    hypothesis: HypothesisKind
+    hypothesis: HypothesisKind = Field(
+        description=(
+            "Pick the explanation the evidence actually supports. "
+            "'command_induced': telecommand activity coincides with the deviation "
+            "(check tc_count_in_window and seconds_since_last_tc against nominal). "
+            "'correlated_channel': the window moves with related channels (check "
+            "the mahalanobis z-score, which is the cross-channel signal). "
+            "'gap_artifact': missing data explains the shape (check gap_fraction "
+            "and max_gap_seconds). "
+            "'isolated_deviation': this channel alone departs from its history, "
+            "with no command or cross-channel or gap explanation. "
+            "'sensor_noise': within plausible noise for this channel."
+        )
+    )
     implicated_channel: str
-    evidence_refs: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(
+        default_factory=list,
+        description="Feature names with their z-scores or values that justify the choice.",
+    )
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -146,8 +174,22 @@ class VerifierInput(BaseModel):
 
 
 class VerifierOutput(BaseModel):
-    status: VerifierStatus
-    reason: str
+    status: VerifierStatus = Field(
+        description=(
+            "Adjudicate what this window IS, not whether the hypothesis sounds "
+            "plausible. 'confirm' = a genuine fault requiring operator attention. "
+            "'reject' = unusual but expected operation (a manoeuvre, a commanded "
+            "change, a known rare mode) — deviant from nominal, but not a fault. "
+            "'disputed' = the evidence genuinely does not settle it."
+        )
+    )
+    reason: str = Field(
+        description=(
+            "One or two sentences citing the specific exemplar distances and "
+            "feature values that decided it. State which labelled exemplar the "
+            "window most resembles and why."
+        )
+    )
 
 
 # --- filing -------------------------------------------------------------------

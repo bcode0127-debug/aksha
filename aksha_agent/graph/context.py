@@ -1,12 +1,21 @@
-"""Context assembly for `prepare_context`: channel history and k nearest windows.
+"""Context assembly for `prepare_context`: channel history and labeled exemplars.
 
-Reads the committed reference built by `scripts/build_context_reference.py`
-from the TRAINING split only, so nothing retrieved here can leak test rows into
-an evaluation run's reasoning context.
+Reads the committed reference built by `scripts/build_context_reference.py`,
+which is restricted to the train period (< 2001-07-01), so nothing retrieved
+here can leak calibration or test rows into an evaluation run's reasoning
+context.
+
+Retrieval is PER CATEGORY, not k-nearest overall. The verifier is asked to
+decide whether a window is a genuine fault or unusual-but-expected operation,
+and it cannot do that from neighbours that all happen to be nominal — which is
+what an overall k-nearest search returns, since nominal windows outnumber the
+rest by roughly forty to one. Returning the nearest known nominal, the nearest
+known rare_event and the nearest known anomaly, each with its distance, gives
+the question something to be answered against.
 
 Everything produced is a summary of named scalars. No raw telemetry array
-reaches an LLM (ADR-003) — the nearest-neighbour result is a feature summary of
-a comparable window, never its series.
+reaches an LLM (ADR-003) — an exemplar is a feature summary of a comparable
+window, never its series.
 """
 from __future__ import annotations
 
@@ -33,7 +42,24 @@ DEFAULT_REFERENCE = (
 # enough that the prompt stays cheap — the spike showed thinking tokens already
 # dominate the bill, so padding the prompt buys nothing.
 TOP_DEVIANT_FEATURES = 6
-K_NEAREST = 3
+PER_CATEGORY = 1
+
+# Ours: features whose z-score is ALWAYS reported, whether or not they are among
+# the most deviant.
+#
+# Two of the investigator's five hypotheses can only be chosen on evidence that
+# was not reliably reaching it. `command_induced` needs telecommand activity;
+# `correlated_channel` needs the cross-channel signal; `gap_artifact` needs the
+# sampling gaps. Ranking features purely by |z| meant those three could be
+# crowded out by whichever statistical moments happened to be extreme, leaving
+# the model able to justify only `isolated_deviation` and `sensor_noise`. This
+# is a fix to the input, not to the prompt.
+ALWAYS_REPORTED = (
+    "mahalanobis",           # cross-channel: correlated_channel
+    "seconds_since_last_tc",  # command activity: command_induced
+    "tc_count_in_window",     # command activity: command_induced
+    "gap_fraction",           # sampling: gap_artifact
+)
 
 
 @lru_cache(maxsize=4)
@@ -50,6 +76,10 @@ class ReferenceContextProvider:
         self.feature_columns: list[str] = data["feature_columns"]
         self.channel_stats: dict = data["channel_stats"]
         self.windows: list[dict] = data["reference_windows"]
+        self.categories: list[str] = data.get(
+            "categories", ["nominal", "rare_event", "anomaly"]
+        )
+        self.train_cut: str | None = data.get("train_cut")
 
     def __call__(
         self, detection: DetectionSummary
@@ -94,57 +124,80 @@ class ReferenceContextProvider:
             scored.append((abs(z), stat))
 
         scored.sort(key=lambda pair: pair[0], reverse=True)
+        chosen = [stat for _, stat in scored[:TOP_DEVIANT_FEATURES]]
+
+        # Guarantee the decision-relevant features are present even when they
+        # are not among the most deviant — see ALWAYS_REPORTED.
+        already = {stat.feature for stat in chosen}
+        by_name = {stat.feature: stat for _, stat in scored}
+        for feature in ALWAYS_REPORTED:
+            if feature not in already and feature in by_name:
+                chosen.append(by_name[feature])
+
         return ChannelHistorySummary(
             channel_id=detection.channel_id,
             reference_windows=int(stats.get("reference_windows", 0)),
-            most_deviant=[stat for _, stat in scored[:TOP_DEVIANT_FEATURES]],
+            most_deviant=chosen,
         )
 
-    def nearest(
-        self, detection: DetectionSummary, k: int = K_NEAREST
-    ) -> list[NeighbourWindow]:
-        """k nearest nominal windows on the same channel, by standardised distance.
+    def _distance(self, detection: DetectionSummary, window: dict, stats: dict) -> float | None:
+        """Standardised distance, using the channel's own nominal spread.
 
-        Standardised using that channel's own nominal spread, so features
-        measured in wildly different units (variance around 1e-8, sample counts
-        around 240) contribute comparably instead of the largest-scale feature
-        dominating the metric.
+        Standardising matters here: features range from variance around 1e-8 to
+        sample counts around 240, so an unstandardised metric would be decided
+        entirely by whichever feature has the largest units.
+        """
+        total = 0.0
+        counted = 0
+        for feature in self.feature_columns:
+            if feature not in detection.features or feature not in window["features"]:
+                continue
+            std = stats["std"].get(feature) or 0.0
+            if std <= 0.0:
+                continue
+            delta = (float(detection.features[feature]) - window["features"][feature]) / std
+            total += delta * delta
+            counted += 1
+        return math.sqrt(total / counted) if counted else None
+
+    def nearest(
+        self, detection: DetectionSummary, per_category: int = PER_CATEGORY
+    ) -> list[NeighbourWindow]:
+        """The nearest labelled exemplar of EACH category, on the same channel.
+
+        Ordered nominal, rare_event, anomaly so the comparison reads
+        consistently, and each carries its distance so the model can weigh which
+        it actually resembles rather than being told.
         """
         stats = self.channel_stats.get(detection.channel_id)
         if not stats:
             return []
 
-        candidates = [w for w in self.windows if w["channel_id"] == detection.channel_id]
-        scored: list[tuple[float, dict]] = []
-        for window in candidates:
-            total = 0.0
-            counted = 0
-            for feature in self.feature_columns:
-                if feature not in detection.features:
-                    continue
-                std = stats["std"].get(feature) or 0.0
-                if std <= 0.0:
-                    continue
-                delta = (float(detection.features[feature]) - window["features"][feature]) / std
-                total += delta * delta
-                counted += 1
-            if counted:
-                scored.append((math.sqrt(total / counted), window))
+        by_category: dict[str, list[tuple[float, dict]]] = {}
+        for window in self.windows:
+            if window["channel_id"] != detection.channel_id:
+                continue
+            distance = self._distance(detection, window, stats)
+            if distance is None:
+                continue
+            by_category.setdefault(window["label"], []).append((distance, window))
 
-        scored.sort(key=lambda pair: pair[0])
-        return [
-            NeighbourWindow(
-                channel_id=window["channel_id"],
-                window_start=window["window_start"],
-                label=window["label"],
-                distance=round(distance, 4),
-                # Only the features the model was told about for this window,
-                # rounded: full float64 precision is noise in a prompt.
-                features={
-                    f: round(float(window["features"][f]), 6)
-                    for f in self.feature_columns
-                    if f in window["features"]
-                },
-            )
-            for distance, window in scored[:k]
-        ]
+        out: list[NeighbourWindow] = []
+        for category in self.categories:
+            scored = sorted(by_category.get(category, []), key=lambda pair: pair[0])
+            for distance, window in scored[:per_category]:
+                out.append(
+                    NeighbourWindow(
+                        channel_id=window["channel_id"],
+                        window_start=window["window_start"],
+                        label=window["label"],
+                        distance=round(distance, 4),
+                        # Rounded: full float64 precision is noise in a prompt.
+                        features={
+                            f: round(float(window["features"][f]), 6)
+                            for f in self.feature_columns
+                            if f in window["features"]
+                        },
+                    )
+                )
+        return out
