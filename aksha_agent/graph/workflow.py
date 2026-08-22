@@ -230,36 +230,68 @@ def _empty_context(detection: DetectionSummary):
 
 INVESTIGATOR_INSTRUCTION = """You are a spacecraft telemetry analyst triaging one flagged window.
 
-You receive: the detector's scores, how the window compares to its own channel's
-nominal history as z-scores, and the nearest nominal reference windows.
+You receive:
+- the detector's scores for this window
+- how the window compares to its own channel's nominal history, as z-scores
+- the nearest labelled exemplar of each category on this channel (nominal,
+  rare_event, anomaly), each with a standardised distance
 
 conformal_p is a calibrated p-value: LOW means the window is unlike nominal
-data. It is NOT a confidence that something is wrong.
+data. It is NOT a confidence that something is wrong. Plenty of expected
+spacecraft behaviour is statistically unusual.
 
-Choose exactly one hypothesis:
-- command_induced: the deviation lines up with telecommand activity
-- correlated_channel: it appears alongside movement in related channels
-- isolated_deviation: this channel alone departs from its history
-- gap_artifact: missing data or sampling gaps explain the shape
-- sensor_noise: within plausible noise for this channel
+Choose the hypothesis the evidence actually supports, and check the evidence for
+each before settling:
+- command_induced: telecommand activity coincides with the deviation. Look at
+  tc_count_in_window and seconds_since_last_tc against their nominal values.
+- correlated_channel: the window moves together with related channels. The
+  mahalanobis z-score is the cross-channel signal; a large one points here.
+- gap_artifact: missing data explains the shape. Look at gap_fraction and
+  max_gap_seconds.
+- isolated_deviation: this channel alone departs from its history, and none of
+  the above explains it. Do not pick this by default — pick it when you have
+  ruled the others out.
+- sensor_noise: within plausible noise for this channel.
 
-Cite concrete evidence in evidence_refs using feature names and numbers you were
-actually given. Do not invent features. Set confidence to your own certainty."""
+Cite concrete evidence in evidence_refs using feature names and the numbers you
+were actually given. Do not invent features. Set confidence to your own
+certainty."""
 
-VERIFIER_INSTRUCTION = """You are an independent verifier reviewing another analyst's triage.
+VERIFIER_INSTRUCTION = """You are an independent verifier adjudicating one flagged telemetry window.
 
-You receive the same evidence and their hypothesis, but NOT their confidence.
-Judge the hypothesis on the evidence alone.
+Your question is NOT "does the evidence support the analyst's hypothesis". A
+window can be strongly deviant and still be entirely expected behaviour, so that
+question has the same answer for faults and for routine rare events, and
+answering it would tell the operators nothing.
 
-conformal_p is a calibrated p-value: LOW means unlike nominal data.
+Your question is: IS THIS A GENUINE FAULT, OR UNUSUAL-BUT-EXPECTED OPERATION?
+
+You receive the window's features, its z-scores against this channel's nominal
+history, the analyst's hypothesis, and — most importantly — the nearest
+labelled exemplar of each category on this same channel, with a standardised
+distance to each:
+- a known NOMINAL window
+- a known RARE_EVENT window: unusual but expected operation, previously judged
+  not to be a fault
+- a known ANOMALY window: a genuine fault
+
+Reason explicitly over those three distances. A window that sits closest to the
+rare_event exemplar looks like known expected behaviour even when it is far from
+nominal. A window closest to the anomaly exemplar looks like a fault. Say which
+one it most resembles and by how much.
+
+conformal_p is a calibrated p-value: LOW means unlike nominal. It does not
+distinguish a fault from a rare event — both are unlike nominal — so do not
+decide on it alone.
 
 Return:
-- confirm: the evidence supports the hypothesis
-- reject: the evidence contradicts it, or a different explanation fits better
-- disputed: the evidence is insufficient to decide
+- confirm: a genuine fault; operators should act
+- reject: unusual but expected operation; deviant, but not a fault
+- disputed: the evidence genuinely does not settle it
 
-Give a one or two sentence reason citing specific numbers. Disagreement is a
-valid and useful outcome; do not confirm merely to agree."""
+Cite the exemplar distances and the feature values that decided it. Rejecting is
+a useful, expected outcome, not a failure — most flagged windows on this mission
+are rare events rather than faults."""
 
 
 # --- the graph ----------------------------------------------------------------
