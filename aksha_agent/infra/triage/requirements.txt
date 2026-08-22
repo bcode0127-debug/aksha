@@ -5,3 +5,4 @@ google-cloud-firestore
 # on any bump — 2.x is not one behaviour surface.
 google-adk==2.3.0
 pydantic
+google-cloud-secret-manager

@@ -206,6 +206,11 @@ SEVERITY_ROUTE = {
 
 TraceWriter = Callable[[str, dict], None]
 
+# Delivery is injected rather than imported, so the graph has no hard dependency
+# on Slack: offline evaluation and the tests run the real routing nodes with no
+# webhook in sight, and `None` means "record only".
+DeliveryFn = Callable[[dict], str]
+
 
 def _null_trace(node: str, payload: dict) -> None:  # pragma: no cover - default
     logger.debug("trace %s: %s", node, payload)
@@ -304,6 +309,7 @@ def build_workflow(
     context_provider: ContextProvider | None = None,
     investigate_model: str | None = None,
     verify_model: str | None = None,
+    deliver: DeliveryFn | None = None,
 ) -> Workflow:
     """Build a triage workflow for one incident.
 
@@ -456,6 +462,8 @@ def build_workflow(
             channel_id=summary.channel_id,
             fragment_id=summary.fragment_id,
             detector_version=summary.detector_version,
+            t_start=summary.t_start,
+            t_end=summary.t_end,
             anomaly_score=summary.score,
             threshold=summary.threshold,
             conformal_p=summary.conformal_p,
@@ -519,12 +527,21 @@ def build_workflow(
     def _notify(node_input, destination: RoutingDestination, node_name: str):
         incident = dict(node_input)
         incident["routing_destination"] = destination.value
-        incident["routing_outcome"] = "recorded"
+
+        # Delivery is attempted, then RECORDED — never assumed. `deliver`
+        # returns a status rather than raising, so an outage marks the incident
+        # `failed` and keeps it, instead of losing an incident the graph has
+        # already spent two LLM calls reasoning about (TRD section 9).
+        outcome = deliver(incident) if deliver else "recorded"
+        incident["routing_outcome"] = outcome
         incident["routing_timestamp_utc"] = _now()
+
         trace(
             node_name,
             {
                 "routing_destination": destination.value,
+                "routing_outcome": outcome,
+                "delivered": outcome == "delivered",
                 "severity": incident.get("severity"),
                 "routing_anomaly": incident.get("routing_anomaly", False),
                 "llm_calls": 0,
