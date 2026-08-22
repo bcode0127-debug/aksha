@@ -42,7 +42,8 @@ cp "${SRC}/Dockerfile" "${SRC}/requirements.txt" "${SRC}/triage_service.py" "${S
 # reference). The detector's model artifact is NOT shipped here: this service
 # never scores anything.
 ( cd "${REPO_ROOT}" && \
-  find aksha_agent/graph aksha_agent/__init__.py -type f -name '*.py' \
+  find aksha_agent/graph aksha_agent/__init__.py \
+       aksha_agent/infra/__init__.py aksha_agent/infra/slack.py -type f -name '*.py' \
     -not -path '*/__pycache__/*' -print0 \
   | while IFS= read -r -d '' f; do
       mkdir -p "${STAGE}/$(dirname "$f")"; cp "$f" "${STAGE}/$f"

@@ -49,6 +49,7 @@ def run_graph(
     hypothesis: str = HypothesisKind.ISOLATED_DEVIATION.value,
     confidence: float = 0.8,
     detection: dict | None = None,
+    deliver=None,
 ):
     """Run the real graph with the two agent nodes stubbed out.
 
@@ -67,6 +68,7 @@ def run_graph(
         context_provider=_context,
         investigate_model="gemini-3.5-flash",
         verify_model="gemini-3.5-flash-lite",
+        deliver=deliver,
     )
 
     by_name = {}

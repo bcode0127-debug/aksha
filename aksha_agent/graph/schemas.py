@@ -209,6 +209,12 @@ class IncidentDoc(BaseModel):
     fragment_id: str
     detector_version: str
 
+    # The window this incident is about. Without these an alert says a channel
+    # is faulty but not when, which is not actionable — and the Slack message
+    # rendered them as "?" until they were carried here.
+    t_start: str | None = None
+    t_end: str | None = None
+
     anomaly_score: float
     threshold: float
     conformal_p: float

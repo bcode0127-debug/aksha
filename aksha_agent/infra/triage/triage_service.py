@@ -27,6 +27,7 @@ from google.cloud import firestore
 
 from aksha_agent.graph.context import ReferenceContextProvider
 from aksha_agent.graph.workflow import build_workflow, investigator_model, verifier_model
+from aksha_agent.infra.slack import SlackNotifier
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("triage_service")
@@ -41,11 +42,20 @@ db = firestore.Client(project=PROJECT_ID)
 CONTEXT_PROVIDER = ReferenceContextProvider()
 INVESTIGATOR_MODEL = investigator_model()
 VERIFIER_MODEL = verifier_model()
+
+# Webhooks resolve here, once. A missing secret disables that destination and is
+# logged; it does not stop the service, because an incident that cannot be
+# delivered still needs to be reasoned about and recorded.
+NOTIFIER = SlackNotifier(project_id=PROJECT_ID)
+
 logger.info(
-    "triage graph ready: investigate=%s verify=%s, context reference %d windows",
+    "triage graph ready: investigate=%s verify=%s, context reference %d exemplars "
+    "(categories %s), slack destinations %s",
     INVESTIGATOR_MODEL,
     VERIFIER_MODEL,
     len(CONTEXT_PROVIDER.windows),
+    CONTEXT_PROVIDER.categories,
+    NOTIFIER.configured or "none",
 )
 
 
@@ -106,6 +116,7 @@ async def handle_push(request: Request) -> Response:
         context_provider=CONTEXT_PROVIDER,
         investigate_model=INVESTIGATOR_MODEL,
         verify_model=VERIFIER_MODEL,
+        deliver=NOTIFIER.post,
     )
 
     runner = Runner(
@@ -152,12 +163,13 @@ async def handle_push(request: Request) -> Response:
 
     db.collection("incidents").document(incident_id).set(incident)
     logger.info(
-        "incident %s: severity=%s verifier=%s route=%s anomaly_flag=%s "
+        "incident %s: severity=%s verifier=%s route=%s delivery=%s anomaly_flag=%s "
         "%.1fs tokens=%d (thoughts=%d) steps=%d",
         incident_id,
         incident.get("severity"),
         incident.get("verifier_status"),
         incident.get("routing_destination"),
+        incident.get("routing_outcome"),
         incident.get("routing_anomaly"),
         elapsed,
         usage["total_tokens"],
