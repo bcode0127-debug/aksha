@@ -49,6 +49,13 @@ from aksha_core.detectors.iforest import feature_columns  # noqa: E402
 
 DEFAULT_UNPURGED = "data/processed/mission2_features_unpurged.parquet"
 DEFAULT_OUT = "aksha_core/artifacts/mission2_context_reference.json"
+DEFAULT_HOLDOUT = "data/processed/mission2_anomaly_holdout.parquet"
+
+# STEP 6: anomaly windows reserved OUT of the reference so fault sensitivity
+# can be measured on windows the verifier has never been shown. Without a
+# holdout the measurement is circular — the exemplar it matches against
+# could be the window itself.
+HOLDOUT_ANOMALIES = 200
 
 # Ours. Per (channel, category), capped so the file stays small enough to commit
 # while every channel still carries its own reference for each class.
@@ -78,6 +85,8 @@ def main() -> int:
     parser.add_argument("--unpurged", default=DEFAULT_UNPURGED)
     parser.add_argument("--out", default=DEFAULT_OUT)
     parser.add_argument("--per-channel", type=int, default=PER_CHANNEL_PER_CATEGORY)
+    parser.add_argument("--holdout-anomalies", type=int, default=HOLDOUT_ANOMALIES)
+    parser.add_argument("--holdout-out", default=DEFAULT_HOLDOUT)
     args = parser.parse_args()
 
     frame = load_unpurged(Path(args.unpurged))
@@ -107,6 +116,21 @@ def main() -> int:
         return 1
 
     rng = np.random.default_rng(SEED)
+
+    # Reserve the holdout FIRST, then build the reference from what remains, so
+    # a held-out window cannot also be an exemplar.
+    holdout = pd.DataFrame()
+    if args.holdout_anomalies > 0:
+        anomalies = train_period[train_period["label"] == "anomaly"]
+        take = min(args.holdout_anomalies, len(anomalies))
+        holdout = anomalies.iloc[rng.choice(len(anomalies), size=take, replace=False)]
+        train_period = train_period.drop(index=holdout.index)
+        out_path = Path(args.holdout_out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        holdout.to_parquet(out_path, index=False)
+        print(f"\nheld out {len(holdout)} anomaly windows -> {out_path}")
+        print(f"  remaining anomaly windows for exemplars: "
+              f"{int((train_period['label'] == 'anomaly').sum()):,}")
 
     # The nominal envelope for z-scores stays NOMINAL-only: it describes what
     # normal looks like, so anomalous windows must not widen it.
@@ -150,6 +174,14 @@ def main() -> int:
     )
     assert set(per_category_counts) == set(CATEGORIES)
     assert all(n > 0 for n in per_category_counts.values()), per_category_counts
+
+    # STEP 6's guarantee, asserted rather than assumed: no held-out window may
+    # appear in the reference, or the fault-sensitivity measurement is circular.
+    if not holdout.empty:
+        held = {(str(r["channel"]), str(r["window_start"])) for _, r in holdout.iterrows()}
+        leaked = [e for e in exemplars if (e["channel_id"], e["window_start"]) in held]
+        assert not leaked, f"{len(leaked)} held-out windows leaked into the reference"
+        print(f"verified: none of the {len(held)} held-out windows are exemplars")
 
     payload = {
         "source_parquet": str(args.unpurged),

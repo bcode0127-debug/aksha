@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import json
 import math
+
+import numpy as np
 from functools import lru_cache
 from pathlib import Path
 
@@ -29,14 +31,12 @@ from aksha_agent.graph.schemas import (
     ChannelStat,
     DetectionSummary,
     NeighbourWindow,
+    RecognitionEvidence,
 )
 
-DEFAULT_REFERENCE = (
-    Path(__file__).resolve().parent.parent.parent
-    / "aksha_core"
-    / "artifacts"
-    / "mission2_context_reference.json"
-)
+_ARTIFACTS = Path(__file__).resolve().parent.parent.parent / "aksha_core" / "artifacts"
+DEFAULT_REFERENCE = _ARTIFACTS / "mission2_context_reference.json"
+DEFAULT_CALIBRATION = _ARTIFACTS / "mission2_recognition_calibration.json"
 
 # Ours: how much context the models get. Enough to compare against, small
 # enough that the prompt stays cheap — the spike showed thinking tokens already
@@ -70,8 +70,14 @@ def _load(path: str) -> dict:
 class ReferenceContextProvider:
     """Channel history and nearest nominal neighbours from the committed set."""
 
-    def __init__(self, reference_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        reference_path: str | Path | None = None,
+        calibration_path: str | Path | None = None,
+    ) -> None:
         self.path = str(reference_path or DEFAULT_REFERENCE)
+        self.calibration_path = str(calibration_path or DEFAULT_CALIBRATION)
+        self._calibration: dict | None = None
         data = _load(self.path)
         self.feature_columns: list[str] = data["feature_columns"]
         self.channel_stats: dict = data["channel_stats"]
@@ -85,6 +91,62 @@ class ReferenceContextProvider:
         self, detection: DetectionSummary
     ) -> tuple[ChannelHistorySummary, list[NeighbourWindow]]:
         return self.channel_history(detection), self.nearest(detection)
+
+    # --- one-sided recognition evidence (what the verifier decides on) --------
+
+    @property
+    def calibration(self) -> dict:
+        if self._calibration is None:
+            path = Path(self.calibration_path)
+            self._calibration = json.loads(path.read_text()) if path.exists() else {}
+        return self._calibration
+
+    def _percentile_of(self, distance: float) -> float:
+        """Place a distance in the known rare events' own nearest-neighbour
+        distribution, by interpolation over the calibrated grid.
+        """
+        values = self.calibration.get("rare_event_percentile_values")
+        grid = self.calibration.get("rare_event_percentile_grid")
+        if not values or not grid:
+            return float("nan")
+        # values is non-decreasing; interp gives the percentile for this distance
+        return float(round(float(np.interp(distance, values, grid)), 1))
+
+    def recognition(self, detection: DetectionSummary) -> RecognitionEvidence:
+        """The verifier's only comparative evidence: how far this window is from
+        the nearest KNOWN expected pattern, calibrated.
+
+        Deliberately one-sided — no anomaly exemplar is computed here, so none
+        can reach the verifier even by accident.
+        """
+        matched = None
+        for neighbour in self.nearest(detection):
+            if neighbour.label == "rare_event":
+                matched = neighbour
+                break
+
+        distance = matched.distance if matched else float("inf")
+        percentile = self._percentile_of(distance) if matched else 100.0
+        reference = self.calibration.get("rare_event_reference", {})
+        median = reference.get("p50")
+        note = (
+            f"Among known expected patterns on this mission, the typical distance to "
+            f"the nearest other expected pattern is {median:.2f} "
+            f"(p25 {reference.get('p25', float('nan')):.2f}, "
+            f"p75 {reference.get('p75', float('nan')):.2f})."
+            if median is not None
+            else "No calibration available."
+        )
+        return RecognitionEvidence(
+            distance_to_nearest_expected=round(float(distance), 4)
+            if matched
+            else 9.99e6,
+            percentile_among_rare_events=min(max(percentile, 0.0), 100.0)
+            if percentile == percentile
+            else 100.0,
+            matched_exemplar=matched,
+            reference_note=note,
+        )
 
     def channel_history(self, detection: DetectionSummary) -> ChannelHistorySummary:
         """The window against its own channel's nominal envelope, as z-scores.

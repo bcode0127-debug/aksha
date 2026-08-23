@@ -154,20 +154,61 @@ class InvestigateOutput(BaseModel):
 # --- verify -------------------------------------------------------------------
 
 
+class RecognitionEvidence(BaseModel):
+    """How far this window sits from the nearest KNOWN expected pattern.
+
+    One-sided by construction. There is no anomaly-exemplar field, because the
+    anomaly comparison measured near-chance on the discrimination that matters
+    (AUC 0.593 for anomaly vs rare_event, on 3,804 vs 3,369 training windows)
+    and demonstrably dragged the verifier toward reject.
+
+    `percentile_among_rare_events` is the calibrated reading: the share of known
+    rare events that sit at least this close to their own nearest neighbour. A
+    low percentile means this window is closer to a known expected pattern than
+    most expected patterns are to each other; a high one means it is further out
+    than almost anything previously judged expected.
+    """
+
+    distance_to_nearest_expected: float = Field(
+        description="RMS standardised distance to the nearest known rare-event window."
+    )
+    percentile_among_rare_events: float = Field(
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Where that distance falls in the distribution of known rare events' own "
+            "nearest-neighbour distances. 50 means typical of a known expected pattern; "
+            "95 means further out than 95% of them."
+        ),
+    )
+    matched_exemplar: NeighbourWindow | None = Field(
+        default=None, description="The nearest known expected window it was compared to."
+    )
+    reference_note: str = Field(
+        default="",
+        description="Calibration context, e.g. the median distance among known rare events.",
+    )
+
+
 class VerifierInput(BaseModel):
-    """ADR-005 enforcement.
+    """ADR-005 enforcement, and the verifier's one-sided evidence.
 
     No `confidence` field exists, and `extra="forbid"` means one cannot be
     smuggled in: constructing this model with a confidence key raises
     `ValidationError`. The verifier therefore cannot anchor on how sure the
     investigator was, because that number never reaches it.
+
+    Note what is ALSO absent: any anomaly exemplar. The verifier is asked
+    whether this window is a recognised expected pattern, and giving it a
+    "which is closer" comparison invited it to answer a different, harder
+    question it answers badly.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     detection: DetectionSummary
     channel_history: ChannelHistorySummary
-    nearest_labeled: list[NeighbourWindow] = Field(default_factory=list)
+    recognition: RecognitionEvidence
     hypothesis: HypothesisKind
     implicated_channel: str
     evidence_refs: list[str] = Field(default_factory=list)

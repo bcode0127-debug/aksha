@@ -59,6 +59,7 @@ from aksha_agent.graph.schemas import (
     IncidentDoc,
     InvestigateInput,
     InvestigateOutput,
+    RecognitionEvidence,
     RoutingDestination,
     Severity,
     VerifierInput,
@@ -144,6 +145,22 @@ AGENT_RETRY = RetryConfig(
 )
 
 AGENT_TIMEOUT_SECONDS = 120.0
+
+# STEP 4 / determinism. Verified against google-adk 2.3.0: `Agent` exposes
+# `generate_content_config`, and google-genai's GenerateContentConfig supports
+# temperature and seed. The verifier previously returned 7 rejects and 1 confirm
+# across 8 identical inputs; a verdict that varies that much on the same
+# evidence is a defect in its own right, independent of which way it leans.
+#
+# Applied to the VERIFY node only, per the packet. The investigator is still
+# sampled, so the pipeline is not fully deterministic end to end — its
+# hypothesis feeds the verifier, and that residual is reported rather than
+# hidden.
+def _deterministic_config():
+    from google.genai import types
+
+    return types.GenerateContentConfig(temperature=0.0, seed=20260822)
+
 
 
 # --- severity (TRD section 7) -------------------------------------------------
@@ -262,41 +279,51 @@ Cite concrete evidence in evidence_refs using feature names and the numbers you
 were actually given. Do not invent features. Set confidence to your own
 certainty."""
 
-VERIFIER_INSTRUCTION = """You are an independent verifier adjudicating one flagged telemetry window.
+VERIFIER_INSTRUCTION = """You are an independent verifier deciding one question about one flagged
+telemetry window:
 
-Your question is NOT "does the evidence support the analyst's hypothesis". A
-window can be strongly deviant and still be entirely expected behaviour, so that
-question has the same answer for faults and for routine rare events, and
-answering it would tell the operators nothing.
+    IS THIS WINDOW A RECOGNISED EXPECTED PATTERN?
 
-Your question is: IS THIS A GENUINE FAULT, OR UNUSUAL-BUT-EXPECTED OPERATION?
+This is a one-sided recognition test, not a comparison. You are NOT asked which
+of two things the window resembles more. You are asked whether it matches
+something this mission has already seen and already judged to be expected
+operation — a manoeuvre, a commanded change, a known rare mode.
 
-You receive the window's features, its z-scores against this channel's nominal
-history, the analyst's hypothesis, and — most importantly — the nearest
-labelled exemplar of each category on this same channel, with a standardised
-distance to each:
-- a known NOMINAL window
-- a known RARE_EVENT window: unusual but expected operation, previously judged
-  not to be a fault
-- a known ANOMALY window: a genuine fault
+YOUR EVIDENCE
 
-Reason explicitly over those three distances. A window that sits closest to the
-rare_event exemplar looks like known expected behaviour even when it is far from
-nominal. A window closest to the anomaly exemplar looks like a fault. Say which
-one it most resembles and by how much.
+`recognition.distance_to_nearest_expected` is the standardised distance from
+this window to the closest known expected pattern on this same channel.
 
-conformal_p is a calibrated p-value: LOW means unlike nominal. It does not
-distinguish a fault from a rare event — both are unlike nominal — so do not
-decide on it alone.
+`recognition.percentile_among_rare_events` is what makes that number readable.
+Known expected patterns are themselves spread out: each one sits some distance
+from its nearest neighbour, and this percentile says where THIS window falls in
+that spread.
+- A LOW percentile means the window sits closer to a known expected pattern
+  than most expected patterns sit to each other. It is well inside the
+  territory of things already judged expected.
+- A HIGH percentile means it is further out than almost anything previously
+  judged expected. Nothing on record looks like it.
 
-Return:
-- confirm: a genuine fault; operators should act
-- reject: unusual but expected operation; deviant, but not a fault
-- disputed: the evidence genuinely does not settle it
+`recognition.reference_note` gives the calibration in absolute terms.
 
-Cite the exemplar distances and the feature values that decided it. Rejecting is
-a useful, expected outcome, not a failure — most flagged windows on this mission
-are rare events rather than faults."""
+HOW TO DECIDE
+
+- reject  = RECOGNISED. It matches known expected operation. Not a fault.
+- confirm = NOT RECOGNISED. Nothing on record looks like this, so treat it as a
+            fault and let an operator judge.
+- disputed = genuinely ambiguous: borderline percentile, or the matched pattern
+             resembles it in some features and not others.
+
+Weigh the percentile as your primary evidence and use the feature z-scores and
+the matched exemplar to sanity-check it. Do not reject merely because the window
+is deviant — everything you see has already been flagged as deviant, so
+deviance alone carries no information here. Reject only if it looks like
+something already known.
+
+conformal_p is a calibrated p-value: LOW means unlike NOMINAL data. It does not
+distinguish a fault from a known rare event, so it cannot answer this question.
+
+State the percentile and the distance that decided it, in one or two sentences."""
 
 
 # --- the graph ----------------------------------------------------------------
@@ -320,6 +347,20 @@ def build_workflow(
     trace = trace or _null_trace
     context_provider = context_provider or _empty_context
     summary = DetectionSummary(**detection)
+
+    # The verifier's evidence is one-sided by construction: only the distance to
+    # the nearest KNOWN EXPECTED pattern, calibrated. If the provider cannot
+    # supply it, the window is treated as unrecognised rather than silently
+    # given a comparison it should not have.
+    def recognise(det: DetectionSummary) -> RecognitionEvidence:
+        getter = getattr(context_provider, "recognition", None)
+        if getter is None:
+            return RecognitionEvidence(
+                distance_to_nearest_expected=9.99e6,
+                percentile_among_rare_events=100.0,
+                reference_note="No recognition reference available.",
+            )
+        return getter(det)
 
     # The investigator's findings travel to file_report through the closure,
     # NOT through the verifier's payload. Putting them in the payload would
@@ -365,11 +406,11 @@ def build_workflow(
         forbids extras, so it cannot be reintroduced downstream.
         """
         findings = InvestigateOutput(**node_input)
-        history, neighbours = context_provider(summary)
+        history, _ = context_provider(summary)
         verifier_input = VerifierInput(
             detection=summary,
             channel_history=history,
-            nearest_labeled=neighbours,
+            recognition=recognise(summary),
             hypothesis=findings.hypothesis,
             implicated_channel=findings.implicated_channel,
             evidence_refs=findings.evidence_refs,
@@ -388,6 +429,9 @@ def build_workflow(
                 "evidence_refs": findings.evidence_refs,
                 "investigator_confidence": findings.confidence,
                 "confidence_forwarded_to_verifier": False,
+                "recognition_distance": verifier_input.recognition.distance_to_nearest_expected,
+                "recognition_percentile": verifier_input.recognition.percentile_among_rare_events,
+                "anomaly_exemplar_forwarded": False,
                 "llm_calls": 0,
             },
         )
@@ -402,6 +446,7 @@ def build_workflow(
         instruction=VERIFIER_INSTRUCTION,
         retry_config=AGENT_RETRY,
         timeout=AGENT_TIMEOUT_SECONDS,
+        generate_content_config=_deterministic_config(),
     )
 
     known_statuses = {s.value for s in VerifierStatus}
