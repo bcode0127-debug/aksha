@@ -157,7 +157,7 @@ def main() -> int:
         detection=PLACEHOLDER_DETECTION,
         incident_id="graph-dump",
         investigate_model="gemini-3.5-flash",
-        verify_model="gemini-3.5-flash-lite",
+        explain_model="gemini-3.5-flash-lite",
     )
     nodes, edges = collect(workflow)
 

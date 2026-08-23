@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from aksha_agent.graph.schemas import RoutingDestination, Severity, VerifierStatus
+from aksha_agent.graph.schemas import RoutingDestination, Severity, Verdict
 from aksha_agent.infra import slack
 from tests.test_graph_workflow import DETECTION, run_graph
 
@@ -69,11 +69,16 @@ def test_rejected_never_escalates():
 # --- routing_anomaly goes to log (TRD section 9) ------------------------------
 
 
-def test_routing_anomaly_goes_to_log_and_is_flagged():
-    incident, trace = run_graph(verifier_status="not-a-real-status")
-    assert incident["routing_anomaly"] is True
+def test_an_unusable_model_status_does_not_disturb_routing():
+    """The model's status is no longer routed on, so a garbage value from it is
+    an audit fact rather than a routing anomaly. The gate's verdict decides the
+    destination exactly as it would have anyway.
+    """
+    incident, trace = run_graph(verifier_status="not-a-real-status", gate_distance=0.5)
     assert incident["routing_destination"] == RoutingDestination.LOG.value
-    assert "file_report_unroutable" in [n for n, _ in trace]
+    assert incident["routing_anomaly"] is False
+    assert incident["llm_verdict"] is None
+    assert dict(trace)["verification_gate"]["llm_status_unrecognised"] is True
 
 
 # --- delivery outcome is recorded, and failure does not lose the incident -----
@@ -140,8 +145,8 @@ INCIDENT = {
     "t_start": "2001-12-14T19:00:00Z",
     "t_end": "2001-12-14T20:00:00Z",
     "severity": "Critical",
-    "verifier_status": "confirm",
-    "verifier_reason": "closest to the anomaly exemplar",
+    "final_verdict": "confirm",
+    "llm_reason": "distance 4.9 sits at the 98th percentile of known rare events",
     "investigator_hypothesis": "isolated_deviation",
     "conformal_p": 0.000626,
     "routing_destination": "flight_director",
@@ -157,7 +162,7 @@ def test_rendered_message_carries_the_operator_relevant_fields():
         "confirm",
         "isolated_deviation",
         "flight_director",
-        "closest to the anomaly exemplar",
+        "98th percentile of known rare events",
         "2001-12-14T19:00:00Z",
     ):
         assert expected in body, f"{expected} missing from the Slack message"
@@ -173,11 +178,28 @@ def test_conformal_p_is_rendered_readably_not_as_zero():
 
 
 def test_disputed_and_routing_anomaly_are_called_out_in_the_message():
-    disputed = json.dumps(slack.render(dict(INCIDENT, verifier_status="disputed")))
+    disputed = json.dumps(slack.render(dict(INCIDENT, final_verdict="disputed")))
     assert "disputed" in disputed.lower()
+    # An operator must be able to tell WHY it is disputed. Under the old design
+    # this meant "two models disagreed"; it now means the distance landed in the
+    # band, and the message has to say the new thing.
+    assert "band" in disputed.lower()
 
     flagged = json.dumps(slack.render(dict(INCIDENT, routing_anomaly=True)))
     assert "routing anomaly" in flagged.lower()
+
+
+def test_a_model_disagreement_is_shown_as_audit_only():
+    """The audit column reaches the operator, labelled so it cannot be mistaken
+    for something that influenced the verdict.
+    """
+    body = json.dumps(slack.render(dict(INCIDENT, llm_verdict="reject"))).lower()
+    assert "reject" in body
+    assert "audit only" in body
+
+    # Agreement is not worth a line: only disagreement is.
+    agreeing = json.dumps(slack.render(dict(INCIDENT, llm_verdict="confirm"))).lower()
+    assert "audit only" not in agreeing
 
 
 def test_post_returns_delivered_on_2xx():
@@ -250,9 +272,9 @@ def test_webhook_url_never_appears_in_the_rendered_message():
 @pytest.mark.parametrize(
     "status,expected",
     [
-        (VerifierStatus.CONFIRM, RoutingDestination.FLIGHT_DIRECTOR),
-        (VerifierStatus.REJECT, RoutingDestination.LOG),
-        (VerifierStatus.DISPUTED, RoutingDestination.LOG),
+        (Verdict.CONFIRM, RoutingDestination.FLIGHT_DIRECTOR),
+        (Verdict.REJECT, RoutingDestination.LOG),
+        (Verdict.DISPUTED, RoutingDestination.LOG),
     ],
 )
 def test_verdict_to_destination_end_to_end(status, expected):

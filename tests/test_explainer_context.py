@@ -20,7 +20,7 @@ import pytest
 
 from aksha_agent.graph import workflow as wf
 from aksha_agent.graph.context import ALWAYS_REPORTED, ReferenceContextProvider
-from aksha_agent.graph.schemas import DetectionSummary, VerifierStatus
+from aksha_agent.graph.schemas import DetectionSummary, Verdict
 from aksha_core.data.mission2 import TRAIN_END
 
 REFERENCE_PATH = (
@@ -169,18 +169,18 @@ def test_verifier_instruction_is_a_one_sided_recognition_test():
     dragged the verdict toward reject). The instruction asks only whether the
     window matches something already known to be expected.
     """
-    text = wf.VERIFIER_INSTRUCTION.lower()
-    assert "recognised expected pattern" in text or "recognized expected pattern" in text
-    assert "one-sided" in text
+    text = wf.EXPLAINER_INSTRUCTION.lower()
+    assert "outlierness" in text
     assert "does the evidence support" not in text
     assert "closest to the anomaly exemplar" not in text
+    assert "recognised expected pattern" not in text
 
 
 def test_verifier_instruction_directs_reasoning_over_the_calibrated_percentile():
     """The percentile is the decision input, and the anomaly side is absent on
     purpose — its presence is what the previous design got wrong.
     """
-    text = wf.VERIFIER_INSTRUCTION.lower()
+    text = wf.EXPLAINER_INSTRUCTION.lower()
     assert "distance" in text
     assert "percentile" in text
     assert "anomaly exemplar" not in text
@@ -191,13 +191,13 @@ def test_verifier_instruction_warns_against_deciding_on_deviance_alone():
     deviance carries no information at this point. Without saying so the model
     treats "unusual" as evidence either way.
     """
-    text = wf.VERIFIER_INSTRUCTION.lower()
+    text = wf.EXPLAINER_INSTRUCTION.lower()
     assert "reject" in text
     assert "deviance alone" in text or "merely because" in text
 
 
 def test_verifier_status_meanings_are_documented_on_the_enum():
-    assert VerifierStatus.__doc__ and "fault" in VerifierStatus.__doc__.lower()
+    assert Verdict.__doc__ and "fault" in Verdict.__doc__.lower()
 
 
 def test_investigator_instruction_points_at_the_features_per_hypothesis():

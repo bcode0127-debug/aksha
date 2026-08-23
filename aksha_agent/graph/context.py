@@ -5,7 +5,7 @@ which is restricted to the train period (< 2001-07-01), so nothing retrieved
 here can leak calibration or test rows into an evaluation run's reasoning
 context.
 
-Retrieval is PER CATEGORY, not k-nearest overall. The verifier is asked to
+Retrieval is PER CATEGORY, not k-nearest overall. The explainer is asked to
 decide whether a window is a genuine fault or unusual-but-expected operation,
 and it cannot do that from neighbours that all happen to be nominal — which is
 what an overall k-nearest search returns, since nominal windows outnumber the
@@ -92,7 +92,7 @@ class ReferenceContextProvider:
     ) -> tuple[ChannelHistorySummary, list[NeighbourWindow]]:
         return self.channel_history(detection), self.nearest(detection)
 
-    # --- one-sided recognition evidence (what the verifier decides on) --------
+    # --- one-sided recognition evidence (what the GATE decides on) ------------
 
     @property
     def calibration(self) -> dict:
@@ -100,6 +100,35 @@ class ReferenceContextProvider:
             path = Path(self.calibration_path)
             self._calibration = json.loads(path.read_text()) if path.exists() else {}
         return self._calibration
+
+    @property
+    def operating_threshold(self) -> float | None:
+        """The gate's distance cut, read from the calibration artifact.
+
+        Deliberately not a constant in this module: the threshold is a property
+        of the calibration, so recalibrating must move it. A missing artifact
+        returns None and the gate falls back to the LLM rather than inventing
+        a number.
+        """
+        cut = self.calibration.get("operating_threshold") or {}
+        value = cut.get("distance")
+        return float(value) if value is not None else None
+
+    @property
+    def ambiguous_band(self) -> tuple[float, float] | None:
+        """The band inside which the gate returns `disputed`, from the artifact.
+
+        Same reasoning as `operating_threshold`: it is a property of the
+        calibration, so recalibrating must move it. Missing or malformed
+        returns None and the gate falls back to a two-way cut rather than
+        inventing a band.
+        """
+        band = self.calibration.get("ambiguous_band") or {}
+        low, high = band.get("low"), band.get("high")
+        if low is None or high is None:
+            return None
+        low, high = float(low), float(high)
+        return (low, high) if low < high else None
 
     def _percentile_of(self, distance: float) -> float:
         """Place a distance in the known rare events' own nearest-neighbour
@@ -113,11 +142,12 @@ class ReferenceContextProvider:
         return float(round(float(np.interp(distance, values, grid)), 1))
 
     def recognition(self, detection: DetectionSummary) -> RecognitionEvidence:
-        """The verifier's only comparative evidence: how far this window is from
+        """The gate's decision input, and the explainer's only comparative
+        evidence: how far this window is from
         the nearest KNOWN expected pattern, calibrated.
 
         Deliberately one-sided — no anomaly exemplar is computed here, so none
-        can reach the verifier even by accident.
+        can reach the explainer even by accident.
         """
         matched = None
         for neighbour in self.nearest(detection):

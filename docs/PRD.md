@@ -20,7 +20,7 @@ Automates the 7-step operator triage loop: open the trend, pull correlated conte
 
 **4. Scope**
 
-In: 5-stage graph (2 LLM nodes, 3 function nodes) covering detect, investigate, verify, file_report, route; severity-gated routing to 3 tiers; Streamlit dashboard; replay loader; eval harness.
+In: 5-stage graph (2 LLM nodes, 3 function nodes) covering detect, investigate, explain, file_report, route; severity-gated routing to 3 tiers; Streamlit dashboard; replay loader; eval harness.
 Gated stretch (only if the Aug 16 skeleton lands with room): autoencoder on raw signals as a second detector, fused via AOM/MOA.
 Out: cascade prediction, OpenTelemetry, digital twin, ESA-ADB as build data, physics-informed models, Open MCT as a dependency.
 
@@ -28,7 +28,7 @@ Out: cascade prediction, OpenTelemetry, digital twin, ESA-ADB as build data, phy
 
 Stage One (pass/fail): Gemini 3.5 via Vertex AI, ADK, GCP services, GCP deployment proof in video, repo, architecture diagram, README spin-up, ~4-min video.
 Stage Two: autonomous multi-step completion with no human intervention (40%); decoupling, state management, scoped tools, failure handling (30%); unedited live execution with visible logs and database writes (30%).
-Product: end-to-end run on OPSSAT-AD with at least one verifier rejection and one correct escalation, measured against ground-truth labels.
+Product: end-to-end run on OPSSAT-AD with at least one gate rejection and one correct escalation, measured against ground-truth labels.
 Evaluation integrity: report the benchmark's own 7 metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on the published 1594/529 split, led by MCC and AUC-PR given ~20% class imbalance. Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
 
 **6. Constraints**
@@ -41,7 +41,7 @@ LLMs never receive raw telemetry arrays: float tokenization degrades precision, 
 
 **8. Prior art and positioning**
 
-No first-of-kind claims. Agentic anomaly triage exists in NASA ground infrastructure (Chou et al., arXiv 2508.21111, JPL DSN). AKSHA's position: domain shift to spacecraft telemetry, LLM-verifies-LLM with an independent verifier, event-driven rather than batch, public benchmark, fully reproducible. Survey citation: Fejjari et al., MDPI Applied Sciences 2025. No standards claims (CCSDS/ECSS/NASA) anywhere without a document number and link.
+No first-of-kind claims. Agentic anomaly triage exists in NASA ground infrastructure (Chou et al., arXiv 2508.21111, JPL DSN). AKSHA's position: domain shift to spacecraft telemetry, a deterministic calibrated gate deciding, with an independent LLM explaining, event-driven rather than batch, public benchmark, fully reproducible. Survey citation: Fejjari et al., MDPI Applied Sciences 2025. No standards claims (CCSDS/ECSS/NASA) anywhere without a document number and link.
 
 **9. Name**
 

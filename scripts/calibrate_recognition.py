@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Calibrate what "close to a known rare event" means, from the training data.
 
-The verifier's decision rests on one question: is this window a RECOGNISED
-expected pattern? That is only answerable if proximity to a known rare event
-actually separates the categories — and if it does, only if we know what
-distance counts as close. Both are empirical questions, and this script answers
-them before any prompt is written.
+The verification gate decides on OUTLIERNESS: how far a window sits from
+anything previously labelled. This script establishes whether that distance
+separates faults from expected operation at all, and if so where to cut.
+
+It also records what the distance is NOT. Nominal windows turn out to sit
+closer to rare-event exemplars than rare events sit to each other, so proximity
+does not mean "this is a known rare event"; it means "this is unremarkable".
+Any framing built on resemblance would be describing something the data does
+not show.
 
 For every window in the train period it computes the distance to the nearest
 rare_event exemplar, and reports the distribution split by true category.
@@ -46,6 +50,15 @@ DEFAULT_REFERENCE = "aksha_core/artifacts/mission2_context_reference.json"
 DEFAULT_OUT = "aksha_core/artifacts/mission2_recognition_calibration.json"
 CATEGORIES = ("nominal", "rare_event", "anomaly")
 PERCENTILES = (1, 5, 10, 25, 50, 75, 90, 95, 99)
+
+# OURS. Half-width of the uncertainty band around the operating point, as a
+# fraction of it. The gate returns `disputed` inside this band instead of
+# forcing a call it cannot support: the distance separates the categories, but
+# not cleanly (AUC 0.788 fault-vs-expected), so there is a zone where the number
+# genuinely does not decide. 0.35 is a choice, not a fitted value — it is set
+# here so that recalibrating moves the band with the threshold, and so that the
+# cost of widening it is measured below rather than assumed.
+AMBIGUOUS_BAND_FRACTION = 0.35
 
 
 def nearest_rare_distances(
@@ -187,6 +200,60 @@ def main() -> int:
         )
         return 2
 
+    # The operating threshold, computed here rather than written down
+    # somewhere as a magic number. Chosen to maximise balanced accuracy for
+    # fault-vs-expected, which weights the two error kinds equally: missing a
+    # fault and waking someone for a routine event are both real costs, and we
+    # have no operator-supplied exchange rate between them.
+    labels = (scored["label"] == "anomaly").to_numpy()
+    dists = scored["d"].to_numpy()
+    best = (0.0, None)
+    for candidate in np.unique(np.percentile(dists, np.arange(1, 100))):
+        predicted = dists >= candidate
+        recall = float((predicted & labels).sum() / max(labels.sum(), 1))
+        specificity = float(((~predicted) & (~labels)).sum() / max((~labels).sum(), 1))
+        balanced = (recall + specificity) / 2.0
+        if balanced > best[0]:
+            best = (balanced, (float(candidate), recall, specificity))
+    threshold, recall, specificity = best[1]
+    print()
+    print("OPERATING THRESHOLD (balanced accuracy)")
+    print("-" * 78)
+    print(f"  distance >= {threshold:.2f}  -> treat as fault")
+    print(f"  fault recall            {recall:.1%}")
+    print(f"  expected specificity    {specificity:.1%}")
+    print(f"  balanced accuracy       {best[0]:.3f}")
+
+    # What the band costs. A three-way rule cannot be scored by recall and
+    # specificity alone, because `disputed` is neither right nor wrong — so
+    # report what lands in the band, by true category, and let the reader see
+    # how much decision it absorbs.
+    low = threshold * (1.0 - AMBIGUOUS_BAND_FRACTION)
+    high = threshold * (1.0 + AMBIGUOUS_BAND_FRACTION)
+    print()
+    print("AMBIGUOUS BAND (gate returns `disputed` inside it)")
+    print("-" * 78)
+    print(f"  band                    [{low:.4f}, {high:.4f}]  "
+          f"(+/-{AMBIGUOUS_BAND_FRACTION:.0%} of the operating point)")
+    band_stats: dict[str, dict] = {}
+    for category in CATEGORIES:
+        values = scored.loc[scored["label"] == category, "d"].to_numpy()
+        if values.size == 0:
+            continue
+        in_band = int(((values > low) & (values < high)).sum())
+        above = int((values >= high).sum())
+        below = int((values <= low).sum())
+        band_stats[category] = {
+            "n": int(values.size),
+            "confirm": above,
+            "disputed": in_band,
+            "reject": below,
+        }
+        print(f"  {category:<12} n={values.size:>7,}  "
+              f"confirm {above / values.size:>6.1%}  "
+              f"disputed {in_band / values.size:>6.1%}  "
+              f"reject {below / values.size:>6.1%}")
+
     # A fine grid over the rare_event distances, so a new window's distance can
     # be placed as a percentile by interpolation rather than bucketed into the
     # nearest of nine coarse points.
@@ -205,9 +272,33 @@ def main() -> int:
         "rare_event_reference": summary.get("rare_event", {}),
         "rare_event_percentile_grid": grid,
         "rare_event_percentile_values": rare_curve,
+        # OURS. The deterministic gate's operating point. Loaded by the graph,
+        # never hardcoded there — changing the calibration must change the gate.
+        "operating_threshold": {
+            "distance": round(threshold, 4),
+            "rule": "distance >= threshold  =>  fault",
+            "fault_recall": round(recall, 4),
+            "expected_specificity": round(specificity, 4),
+            "balanced_accuracy": round(best[0], 4),
+            "chosen_by": "max balanced accuracy on the train period",
+        },
+        # OURS. The gate's three-way cut. `disputed` is a GATE verdict now, not
+        # something the model can assert: it means the calibrated distance fell
+        # in the zone where it does not decide. Loaded by the graph, never
+        # hardcoded there.
+        "ambiguous_band": {
+            "low": round(low, 4),
+            "high": round(high, 4),
+            "fraction_of_threshold": AMBIGUOUS_BAND_FRACTION,
+            "rule": (
+                "distance >= high => confirm; distance <= low => reject; "
+                "otherwise disputed"
+            ),
+            "by_category": band_stats,
+        },
         "separability_auc": {
             "note": "AUC of this distance, anomaly scored as the positive class",
-            "anomaly_vs_nominal_and_rare": None,  # filled by scripts/eval_verifier.py runs
+            "anomaly_vs_nominal_and_rare": None,  # filled by scripts/eval_triage.py runs
         },
     }
     out = Path(args.out)

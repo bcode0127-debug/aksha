@@ -19,7 +19,7 @@ import pytest
 
 from aksha_agent.graph import workflow as wf
 from aksha_agent.graph.context import ReferenceContextProvider
-from aksha_agent.graph.schemas import DetectionSummary, RecognitionEvidence, VerifierInput
+from aksha_agent.graph.schemas import DetectionSummary, RecognitionEvidence, ExplainerInput
 from aksha_core.data.mission2 import TRAIN_END
 
 ARTIFACTS = Path(__file__).resolve().parent.parent / "aksha_core" / "artifacts"
@@ -71,7 +71,7 @@ def test_verifier_input_has_no_anomaly_exemplar_field():
     (AUC 0.593 anomaly vs rare_event) and dragged the verdict toward reject, so
     it is removed from the decision inputs rather than merely de-emphasised.
     """
-    fields = set(VerifierInput.model_fields)
+    fields = set(ExplainerInput.model_fields)
     assert "nearest_labeled" not in fields
     assert "recognition" in fields
 
@@ -94,14 +94,21 @@ def test_matched_exemplar_is_always_an_expected_pattern(provider):
             )
 
 
-def test_verifier_instruction_asks_the_one_sided_question():
-    text = wf.VERIFIER_INSTRUCTION.lower()
-    assert "recognised expected pattern" in text or "recognized expected pattern" in text
-    assert "one-sided" in text
+def test_verifier_instruction_frames_the_number_as_outlierness():
+    """Three framings have now been ruled out by measurement, and none may
+    return: hypothesis-support (always yes for a deviant window), two-sided
+    comparison (AUC 0.593), and recognition/resemblance (nominal windows sit
+    CLOSER to rare-event exemplars than rare events do to each other, so
+    "recognised pattern" describes something false).
+    """
+    text = wf.EXPLAINER_INSTRUCTION.lower()
+    assert "outlierness" in text
     assert "percentile" in text
-    # the two-sided framing must be gone, not merely softened
+    assert "does not mean" in text  # the explicit warning against resemblance
+    assert "does the evidence support" not in text
     assert "closest to the anomaly exemplar" not in text
-    assert "which of two" not in text or "not asked which" in text
+    assert "recognised expected pattern" not in text
+    assert "recognized expected pattern" not in text
 
 
 # --- held-out windows are absent from the reference ---------------------------
@@ -196,13 +203,13 @@ def test_verify_node_is_configured_deterministically():
         },
         incident_id="i",
         investigate_model="gemini-3.5-flash",
-        verify_model="gemini-3.5-flash-lite",
+        explain_model="gemini-3.5-flash-lite",
     )
-    verify = next(
+    explain = next(
         node
         for edge in graph.graph.edges
         for node in (edge.from_node, edge.to_node)
-        if node.name == "verify"
+        if node.name == "explain"
     )
-    assert verify.generate_content_config is not None
-    assert verify.generate_content_config.temperature == 0.0
+    assert explain.generate_content_config is not None
+    assert explain.generate_content_config.temperature == 0.0

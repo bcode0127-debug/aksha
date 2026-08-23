@@ -57,21 +57,29 @@ def render(incident: dict) -> dict:
     severity = str(incident.get("severity", "Advisory"))
     emoji = SEVERITY_EMOJI.get(severity, "⚪")
     destination = str(incident.get("routing_destination", "log"))
-    verdict = str(incident.get("verifier_status") or "n/a")
+    verdict = str(incident.get("final_verdict") or "n/a")
     hypothesis = str(incident.get("investigator_hypothesis") or "n/a")
-    reason = str(incident.get("verifier_reason") or "").strip() or "_no reason recorded_"
+    reason = str(incident.get("llm_reason") or "").strip() or "_no reason recorded_"
+    llm_verdict = incident.get("llm_verdict")
 
     headline = f"{emoji} {severity} — {incident.get('channel_id', 'unknown channel')}"
     flags = []
     if incident.get("routing_anomaly"):
         flags.append("⚠️ routing anomaly (unrecognised route, defaulted to log)")
     if verdict == "disputed":
-        flags.append("⚖️ disputed — investigator and verifier disagree; not escalated")
+        flags.append(
+            "⚖️ disputed — the calibrated distance fell inside the uncertainty "
+            "band; not escalated"
+        )
+    if llm_verdict and llm_verdict != verdict:
+        # Audit only. The model's read did not affect the verdict or the route;
+        # showing it lets an operator see when the two disagree.
+        flags.append(f"🔍 model read this as `{llm_verdict}` (audit only, not applied)")
 
     lines = [
         f"*{headline}*",
         f"*Window* `{incident.get('t_start', '?')}` → `{incident.get('t_end', '?')}`",
-        f"*Verifier* `{verdict}`  •  *Hypothesis* `{hypothesis}`",
+        f"*Verdict* `{verdict}` (gate)  •  *Hypothesis* `{hypothesis}`",
         f"*conformal_p* `{_fmt_p(incident.get('conformal_p'))}` "
         f"(low = unlike nominal)  •  *routed to* `{destination}`",
         "",
@@ -87,7 +95,7 @@ def render(incident: dict) -> dict:
     body = "\n".join(lines)
 
     return {
-        "text": f"{headline} — verifier {verdict} — routed to {destination}",
+        "text": f"{headline} — verdict {verdict} — routed to {destination}",
         "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": body}}],
     }
 
