@@ -201,7 +201,29 @@ async def main_async(args) -> int:
 
     frame = pd.read_parquet(args.parquet)
     artifact = DetectorArtifact.load()
-    sample = build_sample(frame, args.per_class, artifact)
+
+    if args.holdout:
+        # STEP 6: fault sensitivity on anomaly windows absent from the reference.
+        # Train-period, so not a headline metric — but it turns n=1 into a real
+        # measurement of whether the verifier recognises faults at all.
+        from aksha_core.detectors.iforest import feature_columns
+
+        sample = pd.read_parquet(args.holdout)
+        scored = artifact.score_frame(sample)
+        sample = sample.assign(
+            score=scored["score"].to_numpy(),
+            conformal_p=scored["conformal_p"].to_numpy(),
+            threshold=scored["threshold"].to_numpy(),
+        )
+        if args.limit:
+            sample = sample.head(args.limit)
+        sample = sample.reset_index(drop=True)
+        sample.attrs["feature_columns"] = feature_columns(frame)
+        print(f"HOLDOUT fault-sensitivity run: {len(sample)} anomaly windows")
+        print(f"  detector-flagged among them: "
+              f"{int((sample['score'] >= sample['threshold']).sum())}")
+    else:
+        sample = build_sample(frame, args.per_class, artifact)
     columns = sample.attrs["feature_columns"]
 
     print(f"\nsample: {len(sample)} windows")
@@ -259,6 +281,9 @@ def main() -> int:
     parser.add_argument("--concurrency", type=int, default=6)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--out", default=None)
+    parser.add_argument("--holdout", default=None,
+                        help="parquet of held-out anomaly windows (STEP 6 fault sensitivity)")
+    parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
     return asyncio.run(main_async(args))
 

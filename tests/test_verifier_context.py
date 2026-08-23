@@ -160,39 +160,40 @@ def test_decision_relevant_features_are_always_reported(provider):
 # --- the verifier adjudicates rather than agrees ------------------------------
 
 
-def test_verifier_instruction_asks_for_adjudication_not_hypothesis_support():
-    """The framing must be the fault-vs-expected question.
+def test_verifier_instruction_is_a_one_sided_recognition_test():
+    """Superseded framings must not creep back.
 
-    Note the instruction is allowed to *mention* the hypothesis-support framing,
-    because it explicitly rejects it. What must not happen is that framing being
-    asked for: a rare event genuinely IS deviant, so "does the evidence support
-    the hypothesis" has the answer yes for faults and non-faults alike, which
-    makes rejection structurally impossible however good the model is.
+    Two have now been ruled out by measurement: "does the evidence support the
+    hypothesis" (a rare event genuinely IS deviant, so the answer is always yes)
+    and "which exemplar is it closer to" (near-chance at AUC 0.593, and it
+    dragged the verdict toward reject). The instruction asks only whether the
+    window matches something already known to be expected.
     """
     text = wf.VERIFIER_INSTRUCTION.lower()
-    assert "genuine fault" in text
-    assert "unusual-but-expected" in text or "unusual but expected" in text
-
-    support_framing = "does the evidence support"
-    if support_framing in text:
-        prefix = text.split(support_framing)[0]
-        assert prefix.rstrip().endswith("not") or "is not" in prefix[-40:], (
-            "the hypothesis-support framing appears without being negated"
-        )
+    assert "recognised expected pattern" in text or "recognized expected pattern" in text
+    assert "one-sided" in text
+    assert "does the evidence support" not in text
+    assert "closest to the anomaly exemplar" not in text
 
 
-def test_verifier_instruction_directs_reasoning_over_exemplar_distances():
+def test_verifier_instruction_directs_reasoning_over_the_calibrated_percentile():
+    """The percentile is the decision input, and the anomaly side is absent on
+    purpose — its presence is what the previous design got wrong.
+    """
     text = wf.VERIFIER_INSTRUCTION.lower()
     assert "distance" in text
-    for category in CATEGORIES:
-        assert category.replace("_", "_") in text.replace(" ", "_") or category in text
+    assert "percentile" in text
+    assert "anomaly exemplar" not in text
 
 
-def test_verifier_instruction_states_rejection_is_expected():
-    """Without this the model treats reject as a failure state and avoids it."""
+def test_verifier_instruction_warns_against_deciding_on_deviance_alone():
+    """Every window the verifier sees has already been flagged as deviant, so
+    deviance carries no information at this point. Without saying so the model
+    treats "unusual" as evidence either way.
+    """
     text = wf.VERIFIER_INSTRUCTION.lower()
     assert "reject" in text
-    assert "not a failure" in text or "useful" in text
+    assert "deviance alone" in text or "merely because" in text
 
 
 def test_verifier_status_meanings_are_documented_on_the_enum():
