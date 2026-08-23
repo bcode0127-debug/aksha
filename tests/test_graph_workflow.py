@@ -22,8 +22,8 @@ from aksha_agent.graph.schemas import (
     DetectionSummary,
     HypothesisKind,
     Severity,
-    VerifierInput,
-    VerifierStatus,
+    ExplainerInput,
+    Verdict,
 )
 
 DETECTION = {
@@ -43,6 +43,34 @@ def _context(detection: DetectionSummary):
     return ChannelHistorySummary(channel_id=detection.channel_id, reference_windows=7), []
 
 
+# The gate reads these off the provider. Set on the stub so tests exercise the
+# real gate path rather than its no-calibration fallback.
+_context.operating_threshold = 2.0
+
+
+def _make_recognition(distance: float):
+    """Stub recognition evidence at a chosen distance.
+
+    Tests drive the GATE through this, because the gate — not the LLM — decides
+    the verdict. A test that only set the model's opinion would be asserting
+    against a component with no say in the outcome at all.
+    """
+
+    def _recognition(detection: DetectionSummary):
+        from aksha_agent.graph.schemas import RecognitionEvidence
+
+        return RecognitionEvidence(
+            distance_to_nearest_expected=distance,
+            percentile_among_rare_events=95.0 if distance >= 2.0 else 10.0,
+            reference_note="stub",
+        )
+
+    return _recognition
+
+
+_context.recognition = _make_recognition(9.0)
+
+
 def run_graph(
     *,
     verifier_status: str,
@@ -50,6 +78,8 @@ def run_graph(
     confidence: float = 0.8,
     detection: dict | None = None,
     deliver=None,
+    gate_distance: float | None = None,
+    band: tuple[float, float] | None = None,
 ):
     """Run the real graph with the two agent nodes stubbed out.
 
@@ -60,14 +90,36 @@ def run_graph(
     from google.adk.sessions import InMemorySessionService
     from google.adk.workflow import START
 
+    # The GATE decides the verdict, so a test that wants a given outcome must
+    # place the distance, not set the model's opinion. By default the distance
+    # is chosen to produce the requested verdict, which keeps older tests
+    # expressing their original intent; pass `gate_distance` to drive the gate
+    # and the model apart on purpose.
+    band = band or (1.0, 3.0)
+    if gate_distance is None:
+        gate_distance = {
+            "confirm": band[1] + 1.0,
+            "disputed": (band[0] + band[1]) / 2.0,
+        }.get(verifier_status, band[0] - 0.5)
+
+    class _Provider:
+        operating_threshold = (band[0] + band[1]) / 2.0
+        ambiguous_band = band
+        recognition = staticmethod(_make_recognition(gate_distance))
+
+        def __call__(self, detection):
+            return _context(detection)
+
+    provider = _Provider()
+
     trace: list[tuple[str, dict]] = []
     real = wf.build_workflow(
         detection=detection or DETECTION,
         incident_id="frag-test",
         trace=lambda node, payload: trace.append((node, payload)),
-        context_provider=_context,
+        context_provider=provider,
         investigate_model="gemini-3.5-flash",
-        verify_model="gemini-3.5-flash-lite",
+        explain_model="gemini-3.5-flash-lite",
         deliver=deliver,
     )
 
@@ -86,15 +138,15 @@ def run_graph(
             }
         )
 
-    async def fake_verify(node_input):
+    async def fake_explain(node_input):
         # Assert here rather than in a separate test: this is the exact payload
-        # the real verifier would receive, built by the real assemble node.
+        # the real explainer would receive, built by the real assemble node.
         assert "confidence" not in node_input, node_input
         assert "_investigator_confidence" not in node_input, node_input
         return Event(output={"status": verifier_status, "reason": "stubbed"})
 
     def rebuilt(node):
-        return {"investigate": fake_investigate, "verify": fake_verify}.get(node.name, node)
+        return {"investigate": fake_investigate, "explain": fake_explain}.get(node.name, node)
 
     edges = []
     for edge in real.graph.edges:
@@ -148,21 +200,50 @@ def run_graph(
 # --- DEFAULT_ROUTE fires and the incident is still recorded -------------------
 
 
-def test_default_route_fires_on_unknown_status_and_still_records_incident():
-    """The ADR-013 failure mode: an unmatched route ends the branch silently at
-    exit code 0. The DEFAULT_ROUTE edge must catch it and still produce an
-    incident, flagged.
-    """
-    incident, trace = run_graph(verifier_status="banana")
+def test_an_unrecognised_model_status_is_recorded_and_changes_nothing():
+    """This used to be a routing test. It is no longer one, and that is the point.
 
-    assert incident is not None, "unknown route dropped the incident entirely"
-    assert incident["routing_anomaly"] is True
+    An off-enum status from the model was previously a routing hazard, because
+    the model's status WAS the routed value. It no longer is: the gate routes on
+    its own verdict, so a garbage model status cannot reach the router at all.
+    What remains is an audit obligation — it must still be visible that the
+    model returned something unusable, rather than vanishing silently.
+    """
+    incident, trace = run_graph(verifier_status="banana", gate_distance=0.5)
+
+    assert incident is not None, "an unrecognised model status dropped the incident"
+    step = dict(trace)["verification_gate"]
+    assert step["llm_status_unrecognised"] is True
+    assert step["llm_verdict"] is None
+    assert incident["llm_verdict"] is None
+    # It changed nothing: the gate's verdict stands and the route is normal.
+    assert incident["final_verdict"] == Verdict.REJECT.value
+    assert incident["routing_anomaly"] is False, (
+        "a bad MODEL status is an audit fact, not a routing anomaly"
+    )
     assert incident["severity"] == Severity.ADVISORY.value
     assert incident["routing_destination"] == "log"
 
-    nodes = [name for name, _ in trace]
-    assert "file_report_unroutable" in nodes, nodes
-    assert "file_report" not in nodes
+
+def test_default_route_still_catches_an_unroutable_gate_verdict():
+    """DEFAULT_ROUTE is now unreachable via the model, so exercise the router
+    directly with a verdict no branch matches (ADR-013's silent-drop failure).
+    """
+    graph = wf.build_workflow(
+        detection=DETECTION,
+        incident_id="i",
+        investigate_model="gemini-3.5-flash",
+        explain_model="gemini-3.5-flash-lite",
+    )
+    from google.adk.workflow import DEFAULT_ROUTE
+
+    routes = {
+        e.route
+        for e in graph.graph.edges
+        if e.route is not None and e.from_node.name == "route_by_status"
+    }
+    assert DEFAULT_ROUTE in routes, "the silent-drop guard was removed"
+    assert {"confirm", "reject", "disputed"} <= routes
 
 
 def test_known_statuses_do_not_take_the_default_route():
@@ -183,7 +264,7 @@ def test_graph_declares_a_default_route_on_every_dict_edge():
         detection=DETECTION,
         incident_id="i",
         investigate_model="gemini-3.5-flash",
-        verify_model="gemini-3.5-flash-lite",
+        explain_model="gemini-3.5-flash-lite",
     )
     routed_sources = {e.from_node.name for e in graph.graph.edges if e.route is not None}
     default_sources = {
@@ -210,7 +291,7 @@ def test_confirmed_critical_reaches_the_flight_director():
     assert "notify_flight_director" in [n for n, _ in trace]
 
 
-# --- VerifierInput cannot carry confidence (schema level) ---------------------
+# --- ExplainerInput cannot carry confidence (schema level) ---------------------
 
 
 def _verifier_kwargs():
@@ -227,7 +308,7 @@ def _verifier_kwargs():
 
 
 def test_verifier_input_has_no_confidence_field():
-    assert "confidence" not in VerifierInput.model_fields
+    assert "confidence" not in ExplainerInput.model_fields
 
 
 def test_verifier_input_rejects_a_smuggled_confidence():
@@ -235,22 +316,22 @@ def test_verifier_input_rejects_a_smuggled_confidence():
     being silently dropped, so a future caller cannot reintroduce it by accident.
     """
     with pytest.raises(ValidationError):
-        VerifierInput(**_verifier_kwargs(), confidence=0.99)
+        ExplainerInput(**_verifier_kwargs(), confidence=0.99)
 
 
 def test_verifier_input_rejects_any_extra_field():
     with pytest.raises(ValidationError):
-        VerifierInput(**_verifier_kwargs(), investigator_certainty=0.99)
+        ExplainerInput(**_verifier_kwargs(), investigator_certainty=0.99)
 
 
-def test_assemble_node_strips_confidence_before_the_verifier():
-    """End-to-end through the real assemble node: the stub verifier asserts the
+def test_assemble_node_strips_confidence_before_the_explainer():
+    """End-to-end through the real assemble node: the stub explainer asserts the
     absence, so this passing means the drop actually happened in the graph.
     """
     incident, trace = run_graph(verifier_status="confirm", confidence=0.97)
-    step = dict(trace)["assemble_verifier_input"]
+    step = dict(trace)["assemble_explainer_input"]
     assert step["investigator_confidence"] == 0.97
-    assert step["confidence_forwarded_to_verifier"] is False
+    assert step["confidence_forwarded_to_explainer"] is False
     assert incident is not None
 
 
@@ -261,7 +342,7 @@ def test_severity_inverts_on_p_value_direction():
     """conformal_p is a p-value: LOW means anomalous, so severity must RISE as p
     FALLS. If the comparison is flipped to `>=`, this fails.
     """
-    confirm = VerifierStatus.CONFIRM
+    confirm = Verdict.CONFIRM
     strong = wf.compute_severity(0.0001, confirm, "channel_20")
     medium = wf.compute_severity(0.005, confirm, "channel_20")
     weak = wf.compute_severity(0.9, confirm, "channel_20")
@@ -277,7 +358,7 @@ def test_severity_inverts_on_p_value_direction():
 
 
 def test_severity_boundaries_are_inclusive():
-    confirm = VerifierStatus.CONFIRM
+    confirm = Verdict.CONFIRM
     assert wf.compute_severity(wf.CRITICAL_P, confirm, "c") == Severity.CRITICAL
     assert wf.compute_severity(wf.CAUTION_P, confirm, "c") == Severity.CAUTION
 
@@ -292,7 +373,7 @@ def test_severity_never_compares_p_against_the_raw_score_threshold():
     assert wf.CRITICAL_P > 0 and wf.CAUTION_P > 0
     # a very anomalous p must not collapse to Advisory
     assert (
-        wf.compute_severity(0.000626, VerifierStatus.CONFIRM, "channel_20")
+        wf.compute_severity(0.000626, Verdict.CONFIRM, "channel_20")
         == Severity.CRITICAL
     )
 
@@ -325,7 +406,7 @@ def test_only_agent_nodes_carry_retry_config():
         detection=DETECTION,
         incident_id="i",
         investigate_model="gemini-3.5-flash",
-        verify_model="gemini-3.5-flash-lite",
+        explain_model="gemini-3.5-flash-lite",
     )
     nodes = {}
     for edge in graph.graph.edges:
@@ -334,7 +415,7 @@ def test_only_agent_nodes_carry_retry_config():
 
     for name, node in nodes.items():
         retry = getattr(node, "retry_config", None)
-        if name in ("investigate", "verify"):
+        if name in ("investigate", "explain"):
             assert retry is not None, f"{name} should retry transient failures"
             assert retry.exceptions == wf.RETRYABLE_EXCEPTIONS
         else:
@@ -361,7 +442,7 @@ def test_the_two_agents_use_different_models():
         detection=DETECTION,
         incident_id="i",
         investigate_model="gemini-3.5-flash",
-        verify_model="gemini-3.5-flash-lite",
+        explain_model="gemini-3.5-flash-lite",
     )
     models = {
         node.name: getattr(node, "model", None)
@@ -369,7 +450,7 @@ def test_the_two_agents_use_different_models():
         for node in (edge.from_node, edge.to_node)
         if getattr(node, "model", None)
     }
-    assert models["investigate"] != models["verify"]
+    assert models["investigate"] != models["explain"]
 
 
 # --- tracing ------------------------------------------------------------------
@@ -383,7 +464,7 @@ def test_every_executed_node_appends_a_trace_step():
     nodes = [name for name, _ in trace]
     for expected in (
         "prepare_context",
-        "assemble_verifier_input",
+        "assemble_explainer_input",
         "route_by_status",
         "file_report",
         "notify_flight_director",

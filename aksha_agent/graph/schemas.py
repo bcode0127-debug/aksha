@@ -5,7 +5,7 @@ against `input_schema` before the node runs — verified in the ADK spike
 (ADR-013): a malformed payload fails at the receiving node's gate, before any
 LLM call is made.
 
-The load-bearing one is `VerifierInput`. ADR-005 requires the verifier to be
+The load-bearing one is `ExplainerInput`. ADR-005 requires the explainer to be
 structurally unable to see the investigator's confidence, and this is where
 "structurally" is cashed out: the model has no `confidence` field and forbids
 extras, so passing one raises `ValidationError` rather than being quietly
@@ -33,22 +33,24 @@ class HypothesisKind(str, Enum):
     SENSOR_NOISE = "sensor_noise"
 
 
-class VerifierStatus(str, Enum):
-    """The verifier's adjudication: genuine fault, or expected operation?
+class Verdict(str, Enum):
+    """What the window IS: a fault operators should act on, or expected operation.
 
-    These do NOT mean "the hypothesis is supported / contradicted". Asking
-    whether the evidence supports the hypothesis makes the verifier unable to
-    discriminate: a rare-but-expected event IS statistically deviant, so
-    "supported" is the correct answer for it too, and everything gets confirmed.
+    This is the GATE's output. It is produced by comparing a calibrated distance
+    against bounds loaded from the calibration artifact — no model is consulted.
+    The explainer LLM emits the same enum as its own independent read, but that
+    value is recorded for audit and never applied.
 
-    The verifier instead decides what the window IS — a fault that operators
-    should act on, or unusual-but-expected behaviour that they should not be
-    woken for.
+    Note especially what `disputed` means now. It is NOT "the model disagreed"
+    and it is NOT "the investigator and the reviewer conflict". It means the
+    calibrated distance landed inside the uncertainty band, so the number itself
+    does not decide. That is a deterministic, reproducible statement about the
+    evidence rather than a report on model behaviour.
     """
 
     CONFIRM = "confirm"      # a genuine fault: something is wrong with the spacecraft
     REJECT = "reject"        # unusual but expected operation, not a fault
-    DISPUTED = "disputed"    # the evidence does not settle it either way
+    DISPUTED = "disputed"    # inside the calibrated band; the distance does not decide
 
 
 class Severity(str, Enum):
@@ -151,22 +153,22 @@ class InvestigateOutput(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
 
-# --- verify -------------------------------------------------------------------
+# --- explain -------------------------------------------------------------------
 
 
 class RecognitionEvidence(BaseModel):
-    """How far this window sits from the nearest KNOWN expected pattern.
+    """Calibrated OUTLIERNESS: how far out on the tail this window sits.
 
-    One-sided by construction. There is no anomaly-exemplar field, because the
-    anomaly comparison measured near-chance on the discrimination that matters
-    (AUC 0.593 for anomaly vs rare_event, on 3,804 vs 3,369 training windows)
-    and demonstrably dragged the verifier toward reject.
+    One-sided by construction — no anomaly-exemplar field — because that
+    comparison measured near-chance (AUC 0.593 anomaly vs rare_event on 3,804
+    vs 3,369 training windows) and dragged the explainer toward reject.
 
-    `percentile_among_rare_events` is the calibrated reading: the share of known
-    rare events that sit at least this close to their own nearest neighbour. A
-    low percentile means this window is closer to a known expected pattern than
-    most expected patterns are to each other; a high one means it is further out
-    than almost anything previously judged expected.
+    Read as outlierness, NOT as resemblance. The calibration showed nominal
+    windows sit closer to rare-event exemplars (median 1.05) than rare events
+    sit to each other (median 4.37), so a small distance does not mean "this is
+    a known rare event" — it means "this is unremarkable". What the distance
+    tracks is distance from anything on record, which is what correlates with a
+    fault. Describing it as recognition would describe something false.
     """
 
     distance_to_nearest_expected: float = Field(
@@ -190,18 +192,17 @@ class RecognitionEvidence(BaseModel):
     )
 
 
-class VerifierInput(BaseModel):
-    """ADR-005 enforcement, and the verifier's one-sided evidence.
+class ExplainerInput(BaseModel):
+    """ADR-005 enforcement, and the explainer's one-sided evidence.
 
     No `confidence` field exists, and `extra="forbid"` means one cannot be
     smuggled in: constructing this model with a confidence key raises
-    `ValidationError`. The verifier therefore cannot anchor on how sure the
+    `ValidationError`. The explainer therefore cannot anchor on how sure the
     investigator was, because that number never reaches it.
 
-    Note what is ALSO absent: any anomaly exemplar. The verifier is asked
-    whether this window is a recognised expected pattern, and giving it a
-    "which is closer" comparison invited it to answer a different, harder
-    question it answers badly.
+    Note what is ALSO absent: any anomaly exemplar. A "which is closer"
+    comparison measured near-chance (AUC 0.593 anomaly vs rare_event) and
+    dragged the model toward reject, so it is not supplied at all.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -214,21 +215,22 @@ class VerifierInput(BaseModel):
     evidence_refs: list[str] = Field(default_factory=list)
 
 
-class VerifierOutput(BaseModel):
-    status: VerifierStatus = Field(
+class ExplainerOutput(BaseModel):
+    status: Verdict = Field(
         description=(
-            "Adjudicate what this window IS, not whether the hypothesis sounds "
-            "plausible. 'confirm' = a genuine fault requiring operator attention. "
-            "'reject' = unusual but expected operation (a manoeuvre, a commanded "
-            "change, a known rare mode) — deviant from nominal, but not a fault. "
-            "'disputed' = the evidence genuinely does not settle it."
+            "Your own independent read of what this window is. It is RECORDED "
+            "FOR AUDIT and does not affect the outcome — a deterministic gate "
+            "sets the verdict. Answer honestly rather than strategically. "
+            "'confirm' = looks like a genuine fault. 'reject' = looks like "
+            "routine or expected operation. 'disputed' = the evidence does not "
+            "settle it."
         )
     )
     reason: str = Field(
         description=(
-            "One or two sentences citing the specific exemplar distances and "
-            "feature values that decided it. State which labelled exemplar the "
-            "window most resembles and why."
+            "THE FIELD THAT MATTERS. One or two sentences an operator can act "
+            "on, citing the distance, the percentile, and the feature z-scores "
+            "that carry the story. This text is what appears in the alert."
         )
     )
 
@@ -267,8 +269,24 @@ class IncidentDoc(BaseModel):
     implicated_channel: str | None = None
     evidence_refs: list[str] = Field(default_factory=list)
 
-    verifier_status: VerifierStatus | None = None
-    verifier_reason: str | None = None
+    # Three fields, not one. The deterministic gate decides; the LLM's opinion
+    # is recorded beside it rather than replacing it, so disagreement is visible
+    # in the trace and on the dashboard instead of being silently resolved.
+    # The gate decides. `final_verdict` and `gate_verdict` are therefore always
+    # equal by construction; both are kept because the dashboard reads
+    # `final_verdict` and dropping `gate_verdict` would make the audit column
+    # below look like it had something to override.
+    gate_verdict: Verdict | None = None
+    final_verdict: Verdict | None = None
+    gate_distance: float | None = None
+    gate_threshold: float | None = None
+    band_low: float | None = None
+    band_high: float | None = None
+    # AUDIT ONLY. The explainer's independent read and its explanation. The
+    # verdict here never affects routing, severity or delivery — it is stored so
+    # gate-vs-model disagreement stays measurable after the fact.
+    llm_verdict: Verdict | None = None
+    llm_reason: str | None = None
 
     severity: Severity
     routing_destination: RoutingDestination | None = None

@@ -269,6 +269,40 @@
     3105.1317433730987,
     20861.282039815946
   ],
+  "operating_threshold": {
+    "distance": 2.0658,
+    "rule": "distance >= threshold  =>  fault",
+    "fault_recall": 0.944,
+    "expected_specificity": 0.6661,
+    "balanced_accuracy": 0.805,
+    "chosen_by": "max balanced accuracy on the train period"
+  },
+  "ambiguous_band": {
+    "low": 1.3428,
+    "high": 2.7888,
+    "fraction_of_threshold": 0.35,
+    "rule": "distance >= high => confirm; distance <= low => reject; otherwise disputed",
+    "by_category": {
+      "nominal": {
+        "n": 137224,
+        "confirm": 38846,
+        "disputed": 13937,
+        "reject": 84441
+      },
+      "rare_event": {
+        "n": 3369,
+        "confirm": 1927,
+        "disputed": 718,
+        "reject": 724
+      },
+      "anomaly": {
+        "n": 3804,
+        "confirm": 3267,
+        "disputed": 461,
+        "reject": 76
+      }
+    }
+  },
   "separability_auc": {
     "note": "AUC of this distance, anomaly scored as the positive class",
     "anomaly_vs_nominal_and_rare": null

@@ -26,7 +26,7 @@ from fastapi import FastAPI, Request, Response
 from google.cloud import firestore
 
 from aksha_agent.graph.context import ReferenceContextProvider
-from aksha_agent.graph.workflow import build_workflow, investigator_model, verifier_model
+from aksha_agent.graph.workflow import build_workflow, investigator_model, explainer_model
 from aksha_agent.infra.slack import SlackNotifier
 
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +41,7 @@ db = firestore.Client(project=PROJECT_ID)
 # cannot resolve its models or its context reference should not serve at all.
 CONTEXT_PROVIDER = ReferenceContextProvider()
 INVESTIGATOR_MODEL = investigator_model()
-VERIFIER_MODEL = verifier_model()
+EXPLAINER_MODEL = explainer_model()
 
 # Webhooks resolve here, once. A missing secret disables that destination and is
 # logged; it does not stop the service, because an incident that cannot be
@@ -49,10 +49,10 @@ VERIFIER_MODEL = verifier_model()
 NOTIFIER = SlackNotifier(project_id=PROJECT_ID)
 
 logger.info(
-    "triage graph ready: investigate=%s verify=%s, context reference %d exemplars "
+    "triage graph ready: investigate=%s explain=%s, context reference %d exemplars "
     "(categories %s), slack destinations %s",
     INVESTIGATOR_MODEL,
-    VERIFIER_MODEL,
+    EXPLAINER_MODEL,
     len(CONTEXT_PROVIDER.windows),
     CONTEXT_PROVIDER.categories,
     NOTIFIER.configured or "none",
@@ -115,7 +115,7 @@ async def handle_push(request: Request) -> Response:
         trace=trace,
         context_provider=CONTEXT_PROVIDER,
         investigate_model=INVESTIGATOR_MODEL,
-        verify_model=VERIFIER_MODEL,
+        explain_model=EXPLAINER_MODEL,
         deliver=NOTIFIER.post,
     )
 
@@ -159,15 +159,15 @@ async def handle_push(request: Request) -> Response:
     incident["triage_seconds"] = round(elapsed, 2)
     incident["token_usage"] = usage
     incident["llm_calls"] = trace.llm_calls or 2
-    incident["models"] = {"investigate": INVESTIGATOR_MODEL, "verify": VERIFIER_MODEL}
+    incident["models"] = {"investigate": INVESTIGATOR_MODEL, "explain": EXPLAINER_MODEL}
 
     db.collection("incidents").document(incident_id).set(incident)
     logger.info(
-        "incident %s: severity=%s verifier=%s route=%s delivery=%s anomaly_flag=%s "
+        "incident %s: severity=%s verdict=%s route=%s delivery=%s anomaly_flag=%s "
         "%.1fs tokens=%d (thoughts=%d) steps=%d",
         incident_id,
         incident.get("severity"),
-        incident.get("verifier_status"),
+        incident.get("final_verdict"),
         incident.get("routing_destination"),
         incident.get("routing_outcome"),
         incident.get("routing_anomaly"),

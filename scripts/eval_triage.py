@@ -11,9 +11,10 @@ distinguish a genuine fault from unusual-but-expected operation? A verifier that
 confirms everything is worth exactly as much as no verifier at all, and the only
 way to know which one we have is to run it against labelled windows and count.
 
-    python3 scripts/eval_verifier.py                      # default sample
-    python3 scripts/eval_verifier.py --per-class 10       # cheaper run
-    python3 scripts/eval_verifier.py --dry-run            # sample only, no LLM calls
+    python3 scripts/eval_triage.py                      # default sample
+    python3 scripts/eval_triage.py --per-class 10       # cheaper run
+    python3 scripts/eval_triage.py --dry-run            # sample only, no LLM calls
+    python3 scripts/eval_triage.py --golden             # the committed fixed set
 
 Spend: 2 LLM calls per window. The default sample is ~62 windows, so ~124 calls.
 """
@@ -35,6 +36,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 DEFAULT_PARQUET = "data/processed/mission2_features.parquet"
+DEFAULT_GOLDEN = "tests/fixtures/golden_set.json"
 CATEGORIES = ("nominal", "rare_event", "anomaly")
 SEED = 20260818
 
@@ -100,7 +102,10 @@ async def run_one(row: pd.Series, columns: list[str], provider, semaphore) -> di
         "true_label": row["label"],
         "channel": row["channel"],
         "conformal_p": detection["conformal_p"],
-        "verifier_status": None,
+        "final_verdict": None,
+        "gate_verdict": None,
+        "llm_verdict": None,
+        "gate_distance": None,
         "hypothesis": None,
         "severity": None,
         "tokens": 0,
@@ -127,16 +132,19 @@ async def run_one(row: pd.Series, columns: list[str], provider, semaphore) -> di
                     result["thought_tokens"] += meta.thoughts_token_count or 0
                 out = getattr(event, "output", None)
                 if isinstance(out, dict) and "routing_destination" in out:
-                    result["verifier_status"] = out.get("verifier_status")
+                    result["final_verdict"] = out.get("final_verdict")
+                    result["gate_verdict"] = out.get("gate_verdict")
+                    result["llm_verdict"] = out.get("llm_verdict")
+                    result["gate_distance"] = out.get("gate_distance")
                     result["severity"] = out.get("severity")
                     result["hypothesis"] = out.get("investigator_hypothesis")
-                    result["reason"] = out.get("verifier_reason")
+                    result["reason"] = out.get("llm_reason")
         except Exception as exc:  # noqa: BLE001 - one bad window must not end the run
             result["error"] = f"{type(exc).__name__}: {exc}"[:200]
         result["seconds"] = round(time.perf_counter() - started, 2)
 
     for node, payload in steps:
-        if node == "assemble_verifier_input":
+        if node == "assemble_explainer_input":
             result["hypothesis"] = payload.get("hypothesis")
     return result
 
@@ -145,7 +153,7 @@ def confusion(results: list[dict]) -> str:
     statuses = ["confirm", "reject", "disputed", None]
     lines = [
         "",
-        "CONFUSION: verifier_status (columns) vs true category (rows)",
+        "CONFUSION: final verdict (columns) vs true category (rows)",
         "-" * 68,
         f"{'true category':<14}{'confirm':>10}{'reject':>10}{'disputed':>10}{'error':>10}{'n':>8}",
     ]
@@ -153,11 +161,53 @@ def confusion(results: list[dict]) -> str:
         rows = [r for r in results if r["true_label"] == category]
         if not rows:
             continue
-        counts = Counter(r["verifier_status"] if not r["error"] else None for r in rows)
+        counts = Counter(r["final_verdict"] if not r["error"] else None for r in rows)
         lines.append(
             f"{category:<14}"
             + "".join(f"{counts.get(s, 0):>10}" for s in statuses)
             + f"{len(rows):>8}"
+        )
+    return "\n".join(lines)
+
+
+def three_way(results: list[dict]) -> str:
+    """Gate, LLM and final side by side, so the override's effect is visible.
+
+    Reporting only the final verdict would hide whether the gate or the model
+    is carrying the result, which is the whole question this design exists to
+    answer.
+    """
+    ok = [r for r in results if not r["error"]]
+    lines = ["", "GATE vs LLM vs FINAL", "-" * 68]
+    for source in ("gate_verdict", "llm_verdict", "final_verdict"):
+        counts = Counter(r[source] for r in ok)
+        label = {"gate_verdict": "gate", "llm_verdict": "llm", "final_verdict": "final"}[source]
+        lines.append(f"  {label:<7} {dict(counts)}")
+
+    # The invariant, checked on live data rather than only in the test suite:
+    # if these ever diverge, the model has regained influence over the outcome.
+    divergent = [r for r in ok if r["final_verdict"] != r["gate_verdict"]]
+    lines.append(
+        f"  final != gate: {len(divergent)}/{len(ok)}"
+        + ("" if not divergent else "   <-- THE MODEL AFFECTED THE VERDICT")
+    )
+
+    agree = sum(1 for r in ok if r["gate_verdict"] == r["llm_verdict"])
+    lines.append(
+        f"  gate and llm agree: {agree}/{len(ok)} ({agree / max(len(ok),1):.0%})"
+        "   [audit only — disagreement changes nothing]"
+    )
+
+    by_cat = {}
+    for r in ok:
+        by_cat.setdefault(r["true_label"], []).append(r)
+    for category, rows in sorted(by_cat.items()):
+        g = sum(1 for r in rows if r["gate_verdict"] == "confirm")
+        l = sum(1 for r in rows if r["llm_verdict"] == "confirm")
+        f = sum(1 for r in rows if r["final_verdict"] == "confirm")
+        lines.append(
+            f"    {category:<11} confirm-rate  gate {g}/{len(rows)}  "
+            f"llm {l}/{len(rows)}  final {f}/{len(rows)}"
         )
     return "\n".join(lines)
 
@@ -170,24 +220,93 @@ def rates(results: list[dict]) -> str:
 
     lines = ["", "DISCRIMINATION", "-" * 68]
     if expected:
-        rejected = sum(1 for r in expected if r["verifier_status"] == "reject")
+        rejected = sum(1 for r in expected if r["final_verdict"] == "reject")
         lines.append(
             f"  rejected as expected-operation, of non-anomaly windows : "
             f"{rejected}/{len(expected)} ({rejected / len(expected):.0%})"
         )
     if faults:
-        confirmed = sum(1 for r in faults if r["verifier_status"] == "confirm")
+        confirmed = sum(1 for r in faults if r["final_verdict"] == "confirm")
         lines.append(
             f"  confirmed as fault, of true anomaly windows            : "
             f"{confirmed}/{len(faults)} ({confirmed / len(faults):.0%})"
         )
-    by_status = Counter(r["verifier_status"] for r in ok)
+    by_status = Counter(r["final_verdict"] for r in ok)
     lines.append(f"  overall verdict mix: {dict(by_status)}")
     if len(by_status) == 1:
         lines.append(
             "  WARNING: the verifier returned one verdict for every window. It is "
             "not discriminating, whatever the accuracy looks like."
         )
+    return "\n".join(lines)
+
+
+def golden_sample(path: Path) -> pd.DataFrame:
+    """Load the committed golden set as a scored frame.
+
+    Everything the graph needs is already in the file — features, detector
+    score, conformal p, threshold — so this never re-scores and never
+    resamples. That is the point: two runs a week apart see the same windows
+    with the same inputs, so a change in the numbers is a change in the design.
+    """
+    golden = json.loads(path.read_text())
+    windows = golden["windows"]
+    columns = list(windows[0]["features"])
+    frame = pd.DataFrame(
+        [
+            {
+                "channel": w["channel_id"],
+                "window_start": pd.Timestamp(w["window_start"]),
+                "label": w["true_label"],
+                "score": w["score"],
+                "conformal_p": w["conformal_p"],
+                "threshold": w["detector_threshold"],
+                "golden_group": w["group"],
+                "golden_expected": w["expected_verdict"],
+                **w["features"],
+            }
+            for w in windows
+        ]
+    )
+    frame.attrs["feature_columns"] = columns
+    frame.attrs["golden"] = golden
+    return frame
+
+
+def golden_report(results: list[dict], sample: pd.DataFrame) -> str:
+    """Score against the expected verdicts, group by group.
+
+    `ambiguous` rows are counted but never marked right or wrong — they have no
+    expected verdict on purpose. Reporting them as a hit rate would invent an
+    answer the data does not have.
+    """
+    groups = sample["golden_group"].tolist()
+    expected = sample["golden_expected"].tolist()
+    lines = ["", "GOLDEN SET", "-" * 68,
+             f"{'group':<16}{'n':>4}{'expected':>10}{'matched':>10}   verdicts"]
+    hits = total = 0
+    for group in ("clear_fault", "clear_expected", "clear_nominal", "ambiguous"):
+        rows = [(r, e) for r, g, e in zip(results, groups, expected) if g == group]
+        if not rows:
+            continue
+        mix = dict(Counter(r["final_verdict"] for r, _ in rows))
+        want = rows[0][1]
+        # pandas coerces the ambiguous group's None to NaN on the way through
+        # the frame, and NaN is not None — checking identity alone would score
+        # rows that were deliberately given no expected verdict.
+        if want is None or pd.isna(want):
+            lines.append(f"{group:<16}{len(rows):>4}{'(none)':>10}{'-':>10}   {mix}")
+            continue
+        matched = sum(1 for r, e in rows if r["final_verdict"] == e)
+        hits += matched
+        total += len(rows)
+        lines.append(f"{group:<16}{len(rows):>4}{want:>10}{f'{matched}/{len(rows)}':>10}   {mix}")
+    if total:
+        lines.append(f"\n  scored agreement (ambiguous excluded): {hits}/{total} "
+                     f"({hits / total:.0%})")
+    built = sample.attrs["golden"]
+    lines.append(f"  built at gate threshold {built['gate_threshold_at_build']}, "
+                 f"ambiguous band {built['ambiguous_band']}")
     return "\n".join(lines)
 
 
@@ -202,7 +321,11 @@ async def main_async(args) -> int:
     frame = pd.read_parquet(args.parquet)
     artifact = DetectorArtifact.load()
 
-    if args.holdout:
+    if args.golden:
+        sample = golden_sample(Path(args.golden_path))
+        print(f"GOLDEN SET run: {len(sample)} fixed windows "
+              f"({dict(Counter(sample['golden_group']))})")
+    elif args.holdout:
         # STEP 6: fault sensitivity on anomaly windows absent from the reference.
         # Train-period, so not a headline metric — but it turns n=1 into a real
         # measurement of whether the verifier recognises faults at all.
@@ -246,7 +369,10 @@ async def main_async(args) -> int:
     elapsed = time.perf_counter() - started
 
     print(confusion(results))
+    print(three_way(results))
     print(rates(results))
+    if args.golden:
+        print(golden_report(results, sample))
 
     errors = [r for r in results if r["error"]]
     total_tokens = sum(r["tokens"] for r in results)
@@ -284,6 +410,9 @@ def main() -> int:
     parser.add_argument("--holdout", default=None,
                         help="parquet of held-out anomaly windows (STEP 6 fault sensitivity)")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--golden", action="store_true",
+                        help="evaluate the committed fixed golden set (comparable across runs)")
+    parser.add_argument("--golden-path", default=DEFAULT_GOLDEN)
     args = parser.parse_args()
     return asyncio.run(main_async(args))
 
