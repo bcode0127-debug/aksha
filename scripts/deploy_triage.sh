@@ -25,13 +25,27 @@ EXPLAINER_MODEL="${AKSHA_EXPLAINER_MODEL:-gemini-3.5-flash-lite}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="${REPO_ROOT}/aksha_agent/infra/triage"
-REFERENCE="${REPO_ROOT}/aksha_core/artifacts/mission2_context_reference.json"
+ARTIFACT_DIR="${REPO_ROOT}/aksha_core/artifacts"
 
-if [[ ! -f "${REFERENCE}" ]]; then
-  echo "context reference missing: ${REFERENCE}" >&2
-  echo "build it first:  python3 scripts/build_context_reference.py" >&2
-  exit 1
-fi
+# Every artifact the graph reads at runtime, with the command that rebuilds it.
+# The calibration is NOT optional: the verification gate loads its operating
+# threshold and ambiguous band from it, and with the file absent both come back
+# None and the gate raises on every incident — a 500 per message, five delivery
+# attempts, then the DLQ. Shipping the graph without it is shipping a service
+# that cannot triage anything.
+REQUIRED_ARTIFACTS=(
+  "mission2_context_reference.json:python3 scripts/build_context_reference.py"
+  "mission2_recognition_calibration.json:python3 scripts/calibrate_recognition.py"
+)
+
+for entry in "${REQUIRED_ARTIFACTS[@]}"; do
+  name="${entry%%:*}"; how="${entry#*:}"
+  if [[ ! -f "${ARTIFACT_DIR}/${name}" ]]; then
+    echo "required artifact missing: ${ARTIFACT_DIR}/${name}" >&2
+    echo "build it first:  ${how}" >&2
+    exit 1
+  fi
+done
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "${STAGE}"' EXIT
@@ -50,7 +64,9 @@ cp "${SRC}/Dockerfile" "${SRC}/requirements.txt" "${SRC}/triage_service.py" "${S
     done )
 mkdir -p "${STAGE}/aksha_core/artifacts"
 touch "${STAGE}/aksha_core/__init__.py"
-cp "${REFERENCE}" "${STAGE}/aksha_core/artifacts/"
+for entry in "${REQUIRED_ARTIFACTS[@]}"; do
+  cp "${ARTIFACT_DIR}/${entry%%:*}" "${STAGE}/aksha_core/artifacts/"
+done
 
 echo "staged for build:"
 ( cd "${STAGE}" && find . -type f | sort | sed 's/^/  /' )
