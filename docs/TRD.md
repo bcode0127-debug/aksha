@@ -4,7 +4,7 @@
 **1. Pipeline (two-topic split-queue)**
 
 ```
-OPSSAT-AD fragments
+Mission2 fragments (ESA-ADB; see ADR-015)
   → replay loader (publishes in sequence)
   → Pub/Sub topic: telemetry-in  [push]
   → Cloud Run: detector service (fast path, ms-scale)

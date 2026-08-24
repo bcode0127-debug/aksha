@@ -28,12 +28,12 @@ Out: cascade prediction, OpenTelemetry, digital twin, ESA-ADB as build data, phy
 
 Stage One (pass/fail): Gemini 3.5 via Vertex AI, ADK, GCP services, GCP deployment proof in video, repo, architecture diagram, README spin-up, ~4-min video.
 Stage Two: autonomous multi-step completion with no human intervention (40%); decoupling, state management, scoped tools, failure handling (30%); unedited live execution with visible logs and database writes (30%).
-Product: end-to-end run on OPSSAT-AD with at least one gate rejection and one correct escalation, measured against ground-truth labels.
-Evaluation integrity: report the benchmark's own 7 metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on the published 1594/529 split, led by MCC and AUC-PR given ~20% class imbalance. Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
+Product: end-to-end run on ESA-ADB Mission2 with at least one gate rejection and one correct escalation, measured against ground-truth labels.
+Evaluation integrity: report the 7 benchmark-style metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on ESA-ADB Mission2's own train/calibration/test split (137,235/23,970/168,410 windows), positive class `rare_event ∪ anomaly` — Mission2's test split carries only 4 true anomaly-labelled windows from a single event, too few to support an anomaly-only metric on its own (ADR-015; docs/mission2-adapter-notes.md). Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
 
 **6. Constraints**
 
-Solo. Submit Aug 29; hard close Aug 31, 5pm PT. $150 GCP credits; Gemini Flash by default; min instances 0; resources deleted after recording. Mac mini only. OPSSAT-AD (18.5 MB, CC-BY 4.0, cited). Fresh repo; all code written in the submission window. PoC bar, not research grade.
+Solo. Submit Aug 29; hard close Aug 31, 5pm PT. $150 GCP credits; Gemini Flash by default; min instances 0; resources deleted after recording. Mac mini only. ESA-ADB Mission2 lightweight subset, channels 18-28 (CC BY 3.0 IGO, cited; see ADR-015). Fresh repo; all code written in the submission window. PoC bar, not research grade.
 
 **7. Hard architectural rule**
 
