@@ -16,8 +16,11 @@ python3 -m aksha_core.data.mission2 --stats-out /tmp/m2_stats.json
 ```
 
 Data location resolves in order: `--data-root`, then `$AKSHA_MISSION2_DIR`,
-then `~/Desktop/aksha-datasets/esa-adb/mission2/ESA-Mission2`. No absolute path
-is hardcoded.
+then `data/esa-adb/mission2/ESA-Mission2` (relative to the repo root, inside
+the gitignored `data/` -- populated by `scripts/fetch_mission2.py`). No
+absolute path is hardcoded. Before this was fixed the default pointed at
+`~/Desktop/aksha-datasets/...`, a path that existed only on the machine that
+wrote it -- a fresh clone had no way to reproduce the build.
 
 ## Sourced from ESA-ADB, not ours
 

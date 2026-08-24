@@ -77,7 +77,10 @@ GAP_MULTIPLE = 2.0
 SMOOTH_WINDOW = 10
 
 ENV_DATA_ROOT = "AKSHA_MISSION2_DIR"
-DEFAULT_DATA_ROOT = "~/Desktop/aksha-datasets/esa-adb/mission2/ESA-Mission2"
+# Inside the repo's gitignored data/, populated by scripts/fetch_mission2.py
+# (ADR-015) -- not a path outside the repo, so a fresh clone reproduces the
+# build without editing this file. AKSHA_MISSION2_DIR still overrides it.
+DEFAULT_DATA_ROOT = "data/esa-adb/mission2/ESA-Mission2"
 
 _NS_PER_S = 1_000_000_000
 
