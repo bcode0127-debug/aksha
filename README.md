@@ -10,8 +10,19 @@ Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
 
 ## Spin-up
 
-1. `python3 scripts/fetch_data.py` — downloads `dataset.csv` and `segments.csv` (OPSSAT-AD, cited for operator-requirements framing — see [ADR-015](docs/adr/ADR-015.md)) into `data/`, checksum-verified.
-2. Enable the required GCP APIs:
+The trained detector, calibration, and context reference are committed
+(`aksha_core/artifacts/`), so running the deployed pipeline needs neither
+fetch step below. They're only required to retrain or recalibrate from raw
+data (`scripts/train_detector.py`, `scripts/calibrate_recognition.py`,
+`scripts/build_context_reference.py`).
+
+1. `python3 scripts/fetch_mission2.py` — downloads and unpacks ESA-ADB's
+   Mission2 (3.8 GB, CC BY 3.0 IGO, the build dataset — see
+   [ADR-015](docs/adr/ADR-015.md)) into `data/`, checksum-verified.
+2. `python3 scripts/fetch_data.py` — downloads `dataset.csv` and
+   `segments.csv` (OPSSAT-AD, cited for operator-requirements framing only —
+   see [ADR-015](docs/adr/ADR-015.md)) into `data/`, checksum-verified.
+3. Enable the required GCP APIs:
    ```
    gcloud services enable run.googleapis.com pubsub.googleapis.com firestore.googleapis.com aiplatform.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com billingbudgets.googleapis.com
    ```
