@@ -168,12 +168,15 @@ def _deterministic_config():
 # OURS. The gate decides, alone. The model never touches the verdict.
 #
 # Measured on 200 held-out train-period faults, given the SAME distance the
-# model was handed: the threshold confirmed 93/100 of detector-flagged faults,
-# the LLM 70/100. The model reads this signal worse than a comparison against a
-# constant does, and the separability analysis says that is a property of the
-# signal (AUC 0.593 anomaly vs rare_event), not of the wording. So the decision
-# is the number's, and the model keeps the job it is actually good at: saying
-# why, in language an operator can act on.
+# model was handed: the threshold confirmed 177/200 (88.5%) of detector-flagged
+# faults, the LLM 103/200 (51.5%) -- re-measured live 2026-08-23, post-#16
+# (scripts/eval_triage.py --holdout data/processed/mission2_anomaly_holdout.parquet).
+# The model reads this signal worse than a comparison against a constant does,
+# and the separability analysis says that is a property of the signal (AUC
+# 0.610 anomaly vs rare_event, 0.795 anomaly vs nominal+rare_event -- recomputed
+# the same session via scripts/calibrate_recognition.py:nearest_rare_distances),
+# not of the wording. So the decision is the number's, and the model keeps the
+# job it is actually good at: saying why, in language an operator can act on.
 #
 # An earlier revision let the model escalate a gate-reject to `disputed`. That
 # is removed. It made `disputed` mean "the model disagreed", which on the test

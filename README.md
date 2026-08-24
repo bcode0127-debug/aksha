@@ -10,7 +10,7 @@ Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
 
 ## Spin-up
 
-1. `python3 scripts/fetch_data.py` — downloads `dataset.csv` and `segments.csv` (OPSSAT-AD) into `data/`, checksum-verified.
+1. `python3 scripts/fetch_data.py` — downloads `dataset.csv` and `segments.csv` (OPSSAT-AD, cited for operator-requirements framing — see [ADR-015](docs/adr/ADR-015.md)) into `data/`, checksum-verified.
 2. Enable the required GCP APIs:
    ```
    gcloud services enable run.googleapis.com pubsub.googleapis.com firestore.googleapis.com aiplatform.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com billingbudgets.googleapis.com
@@ -28,12 +28,13 @@ All code written during the All Things Agentic submission period. No pre-existin
 
 ## Data & Citation
 
-This project uses the **OPSSAT-AD** dataset (CC-BY 4.0):
+The detector, gate calibration, and golden set are built on **ESA-ADB's Mission2** benchmark (CC BY 3.0 IGO), specifically its lightweight channel subset (channels 18–28) — see [ADR-015](docs/adr/ADR-015.md):
+
+> Kotowski, K., Haskamp, C., Andrzejewski, J., Ruszczak, B., Nalepa, J., Lakey, D., Collins, P., Kolmas, A., Bartesaghi, M., Martínez-Heras, J., De Canio, G. (2024). *European Space Agency Benchmark for Anomaly Detection in Satellite Telemetry*. arXiv:2406.17826. Dataset: Zenodo, DOI: [10.5281/zenodo.15237121](https://doi.org/10.5281/zenodo.15237121).
+
+**OPSSAT-AD** (CC-BY 4.0) is cited for its operator-requirements framing, not as build data — see [ADR-006](docs/adr/ADR-006.md) (superseded by ADR-015):
 
 > Ruszczak, B., Kotowski, K., Evans, D., Nalepa, J. et al. (2025). *The OPS-SAT benchmark for detecting anomalies in satellite telemetry*. Scientific Data. Dataset: Zenodo, DOI: [10.5281/zenodo.15108715](https://doi.org/10.5281/zenodo.15108715).
-
-
-Operator requirements are sourced from **ESA-ADB** (European Space Agency Anomaly Detection Benchmark).
 
 ## License
 

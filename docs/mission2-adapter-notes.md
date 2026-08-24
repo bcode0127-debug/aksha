@@ -183,11 +183,12 @@ Consequences, stated plainly:
   overabundance of rare nominal events", and calling it the mission's main
   challenge (arXiv 2406.17826).
 
-Open for the next packet: whether the evidence panel evaluates against
-`rare_event ∪ anomaly`, or whether OPSSAT-AD remains the sole source of
-headline detection metrics with Mission2 used for the operational story only.
+Resolved by ADR-015: the evidence panel evaluates against `rare_event ∪
+anomaly`, not against OPSSAT-AD. Mission2 is the build dataset; OPSSAT-AD is
+retained only as an operator-requirements citation, not as a source of
+headline detection metrics.
 
-Pooling the two categories would follow ESA-ADB's own benchmarking convention,
+Pooling the two categories follows ESA-ADB's own benchmarking convention,
 verified in the paper (arXiv 2406.17826): *"There are no algorithms in ESA-ADB
 that can explicitly distinguish between anomalies and rare nominal events, so
 the results in Table 2 are presented for all events (excluding only
