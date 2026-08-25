@@ -76,16 +76,22 @@ def fetch_zip() -> Path:
 
 
 def unpack(zip_path: Path) -> None:
-    """Extract the zip.
+    """Extract the zip directly into UNPACK_DIR.
 
-    ASSUMPTION, not verified in-session (no disk headroom to actually unzip
-    the 3.8 GB archive at the time this was written -- see the PR that added
-    this file): the zip's own top-level entry is a directory named
-    "ESA-Mission2/", the same convention the previous local cache directory
-    name implied. If that assumption is wrong, this will unpack one level off
-    from UNPACK_DIR and aksha_core/data/mission2.py's data_root() will not
-    find channels/, labels.csv, etc. -- re-verify the first time this actually
-    runs against real disk space.
+    Verified against ESA-Mission1.zip (same publisher, same ESA-AD pipeline,
+    found already extracted on this machine): its entries are flat --
+    channels/, telecommands/, labels.csv, channels.csv, telecommands.csv,
+    anomaly_types.csv sit at the top level, with no internal "ESA-Mission1/"
+    prefix. The containing folder name is imposed by whoever extracts it, not
+    part of the archive. An earlier version of this function extracted to
+    UNPACK_DIR.parent on the opposite assumption (that the zip itself
+    provided the nesting) -- that was wrong; data_root()'s expectation in
+    aksha_core/data/mission2.py was right. Still not verified against the
+    actual Mission2 archive's bytes: the only copy found locally
+    (~/aksha-datasets/esa-adb/ESA-Mission2.zip) is 3,422,552,064 bytes against
+    Zenodo's published 4,098,539,932 for record 15237121, and fails to open
+    as a zip at all -- it belongs to an unrelated project's data cache
+    (see that directory's PROVENANCE.md) and was not usable for this check.
     """
     if UNPACK_DIR.exists() and any(UNPACK_DIR.iterdir()):
         print(f"{UNPACK_DIR}: already populated, skipping unzip")
@@ -101,10 +107,10 @@ def unpack(zip_path: Path) -> None:
             "(the verified zip is kept, so this resumes at unzip)."
         )
 
-    UNPACK_DIR.parent.mkdir(parents=True, exist_ok=True)
+    UNPACK_DIR.mkdir(parents=True, exist_ok=True)
     print(f"unzipping to {UNPACK_DIR} ...")
     with zipfile.ZipFile(zip_path) as z:
-        z.extractall(UNPACK_DIR.parent)
+        z.extractall(UNPACK_DIR)
     print(f"unpacked: {UNPACK_DIR}")
 
 
