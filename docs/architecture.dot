@@ -1,0 +1,69 @@
+digraph aksha_triage_architecture {
+	fontname=Helvetica fontsize=20 label="AKSHA -- detect-to-route triage pipeline
+(generated from Workflow.graph.edges -- ADR-013)" labelloc=t rankdir=TB
+	node [fontname=Helvetica fontsize=11]
+	compound=true
+	subgraph cluster_detector {
+		color="#999999" fontname="Helvetica-Bold" fontsize=13 label="detector-service (Cloud Run) -- fast path" style=dashed
+		telemetry_in [label="Pub/Sub topic
+telemetry-in" fillcolor="#D8F5D0" fontname="Helvetica-Oblique" fontsize=11 shape=component style=filled]
+		detect [label="detect
+(IForest + split conformal)" fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		telemetry_in -> detect
+	}
+	firestore [label="Firestore
+incidents/ + traces/" fillcolor="#E3E3E3" fontname="Helvetica-Oblique" fontsize=11 shape=cylinder style=filled]
+	detect -> firestore [label=DetectionResult color="#777777" constraint=false fontcolor="#777777" fontsize=10 style=dotted]
+	subgraph cluster_triage {
+		color="#666666" fontname="Helvetica-Bold" fontsize=13 label="triage-service (Cloud Run) -- slow path, ADK 2 Workflow graph" style=solid
+		triage_topic [label="Pub/Sub topic
+triage" fillcolor="#D8F5D0" fontname="Helvetica-Oblique" fontsize=11 shape=component style=filled]
+		__START__ [label=START fillcolor="#333333" fixedsize=true fontcolor=white fontsize=10 shape=circle style=filled width=0.5]
+		assemble_explainer_input [label=assemble_explainer_input fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		explain [label="explain
+(gemini-3.5-flash-lite)" fillcolor="#CFE8FF" fontname="Helvetica-Bold" penwidth=2 shape=box style="filled,rounded"]
+		file_report [label=file_report fillcolor="#FFE9B3" fontname="Helvetica-Bold" shape=diamond style=filled]
+		file_report_disputed [label=file_report_disputed fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		file_report_rejected [label=file_report_rejected fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		file_report_unroutable [label=file_report_unroutable fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		investigate [label="investigate
+(gemini-3.5-flash)" fillcolor="#CFE8FF" fontname="Helvetica-Bold" penwidth=2 shape=box style="filled,rounded"]
+		notify_flight_director [label=notify_flight_director fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		notify_subsystem_engineer [label=notify_subsystem_engineer fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		prepare_context [label=prepare_context fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		record_to_log [label=record_to_log fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		record_unroutable [label=record_unroutable fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		route_by_status [label=route_by_status fillcolor="#FFE9B3" fontname="Helvetica-Bold" shape=diamond style=filled]
+		verification_gate [label=verification_gate fillcolor="#EFEFEF" fontname=Helvetica shape=box style="filled,rounded"]
+		triage_topic -> __START__ [label=push color="#555555"]
+		__START__ -> prepare_context [color="#555555"]
+		prepare_context -> investigate [color="#555555"]
+		investigate -> assemble_explainer_input [color="#555555"]
+		assemble_explainer_input -> explain [color="#555555"]
+		explain -> verification_gate [color="#555555"]
+		verification_gate -> route_by_status [color="#555555"]
+		route_by_status -> file_report [label=confirm color="#8A6D00" fontcolor="#8A6D00"]
+		route_by_status -> file_report_rejected [label=reject color="#8A6D00" fontcolor="#8A6D00"]
+		route_by_status -> file_report_disputed [label=disputed color="#8A6D00" fontcolor="#8A6D00"]
+		route_by_status -> file_report_unroutable [label=DEFAULT_ROUTE color="#B00020" fontcolor="#B00020" penwidth=1.5 style=dashed]
+		file_report -> notify_flight_director [label=Critical color="#8A6D00" fontcolor="#8A6D00"]
+		file_report -> notify_subsystem_engineer [label=Caution color="#8A6D00" fontcolor="#8A6D00"]
+		file_report -> record_to_log [label=Advisory color="#8A6D00" fontcolor="#8A6D00"]
+		file_report -> record_unroutable [label=DEFAULT_ROUTE color="#B00020" fontcolor="#B00020" penwidth=1.5 style=dashed]
+		file_report_rejected -> record_to_log [color="#555555"]
+		file_report_disputed -> record_to_log [color="#555555"]
+		file_report_unroutable -> record_to_log [color="#555555"]
+	}
+	detect -> triage_topic [label="publish
+DetectionResult" color="#777777" constraint=false fontcolor="#777777" fontsize=10 style=dotted]
+	verification_gate -> firestore [label="trace() every node
++ final incident doc" color="#777777" constraint=false fontcolor="#777777" fontsize=10 ltail=cluster_triage style=dotted]
+	secret_manager [label="Secret Manager
+slack-flight-director
+slack-subsystem
+slack-log" fillcolor="#E3E3E3" fontname="Helvetica-Oblique" fontsize=11 shape=cylinder style=filled]
+	secret_manager -> notify_flight_director [label="webhook URL" color="#777777" constraint=false fontcolor="#777777" fontsize=10 style=dotted]
+	secret_manager -> notify_subsystem_engineer [label="webhook URL" color="#777777" constraint=false fontcolor="#777777" fontsize=10 style=dotted]
+	secret_manager -> record_to_log [label="webhook URL" color="#777777" constraint=false fontcolor="#777777" fontsize=10 style=dotted]
+	secret_manager -> record_unroutable [label="webhook URL" color="#777777" constraint=false fontcolor="#777777" fontsize=10 style=dotted]
+}
