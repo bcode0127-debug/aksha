@@ -4,7 +4,12 @@ Anomaly detection for spacecraft telemetry, with conformal-calibrated confidence
 
 ## Architecture
 
-_Placeholder: diagram generated from `Workflow.graph.edges`._
+![AKSHA architecture](docs/architecture.svg)
+
+Generated straight from the live `Workflow.graph.edges` object (`scripts/render_diagram.py`), not hand-drawn — rename a node and this changes with it (ADR-013). Regenerate with:
+```
+python3 scripts/render_diagram.py
+```
 
 Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
 
