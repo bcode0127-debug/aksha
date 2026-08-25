@@ -34,6 +34,16 @@ data (`scripts/train_detector.py`, `scripts/calibrate_recognition.py`,
 
 _Remaining steps: placeholder._
 
+## Dashboard
+
+Read-only view over live Firestore state — recent incidents, per-node trace,
+and the gate-vs-LLM audit block for whichever one you select. No auth, no
+writes. Run it locally with ADC (`gcloud auth application-default login`)
+against the same project the services use:
+```
+streamlit run aksha_agent/dashboard/app.py
+```
+
 ## Evaluation
 
 _Placeholder._

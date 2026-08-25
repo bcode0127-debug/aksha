@@ -1,0 +1,13 @@
+# Dark theme, larger base font -- this dashboard is built to be filmed
+# (STEP 4 of the packet that added it), not just browsed.
+[theme]
+base = "dark"
+primaryColor = "#4FA3FF"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1D23"
+textColor = "#FAFAFA"
+font = "sans serif"
+baseFontSize = 18
+
+[server]
+headless = true

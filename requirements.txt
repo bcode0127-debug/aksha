@@ -15,3 +15,4 @@ fastapi
 uvicorn[standard]
 google-cloud-firestore
 google-cloud-pubsub
+streamlit
