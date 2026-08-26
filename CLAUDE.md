@@ -46,3 +46,7 @@ the repo for the old name and update every reference in the same commit.
   number and a link to the source. "Standards-aligned" with no citation is not acceptable.
 - No unverified numbers or citations in any file. Verify against source in-session or mark
   TODO. Looked-plausible is not verified.
+
+## Writing style
+
+- Use em dashes (—) in prose — docs, commit messages, PR descriptions. User directive.
