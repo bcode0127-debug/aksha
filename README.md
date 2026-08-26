@@ -108,9 +108,11 @@ scripts/deploy_detector.sh [PROJECT_ID] [REGION]
 scripts/deploy_triage.sh [PROJECT_ID] [RUN_REGION]
 ```
 
-**Dashboard** — read-only view over live Firestore state (recent incidents,
-per-node trace, gate-vs-LLM audit block), run locally with ADC:
+**Dashboard** — read-only telemetry-triage console over live Firestore state:
+the flagged channel's raw signal, a calibrated threshold-overlay decision
+panel, and a clickable incident strip. Run locally with ADC:
 ```
+python3 scripts/precompute_signal_cache.py   # once, or after new incidents land
 streamlit run aksha_agent/dashboard/app.py
 ```
 
