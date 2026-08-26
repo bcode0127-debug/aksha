@@ -18,6 +18,7 @@ editing any code.
 import argparse
 import hashlib
 import shutil
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -75,42 +76,56 @@ def fetch_zip() -> Path:
     return dest
 
 
-def unpack(zip_path: Path) -> None:
-    """Extract the zip directly into UNPACK_DIR.
+# Hard floor kept free after extraction -- checked against the archive's own
+# reported uncompressed size (cheap: zipfile reads the central directory,
+# no decompression) rather than guessed as a multiple of the zip's
+# compressed size. That guess was wrong in practice: this archive's member
+# sizes show 4.10 GB uncompressed against a 4.10 GB compressed download --
+# these are mostly `stored` (uncompressed) pickled float64 arrays, not
+# ~2:1 deflate.
+MIN_FREE_BYTES = 500_000_000
 
-    Verified against ESA-Mission1.zip (same publisher, same ESA-AD pipeline,
-    found already extracted on this machine): its entries are flat --
-    channels/, telecommands/, labels.csv, channels.csv, telecommands.csv,
-    anomaly_types.csv sit at the top level, with no internal "ESA-Mission1/"
-    prefix. The containing folder name is imposed by whoever extracts it, not
-    part of the archive. An earlier version of this function extracted to
-    UNPACK_DIR.parent on the opposite assumption (that the zip itself
-    provided the nesting) -- that was wrong; data_root()'s expectation in
-    aksha_core/data/mission2.py was right. Still not verified against the
-    actual Mission2 archive's bytes: the only copy found locally
-    (~/aksha-datasets/esa-adb/ESA-Mission2.zip) is 3,422,552,064 bytes against
-    Zenodo's published 4,098,539,932 for record 15237121, and fails to open
-    as a zip at all -- it belongs to an unrelated project's data cache
-    (see that directory's PROVENANCE.md) and was not usable for this check.
+
+def unpack(zip_path: Path) -> None:
+    """Extract the zip via the system `unzip`, not Python's zipfile module.
+
+    Two things forced this, both discovered against the real archive (not
+    inferred from the ESA-Mission1 sibling this module previously reasoned
+    from, which turned out to be a different-shaped extraction):
+
+    1. One member (channels.csv) uses Deflate64 (zip method 9), which
+       Python's zipfile cannot decompress at all ("That compression method
+       is not supported"). The system `unzip` handles it fine.
+    2. The archive's own top-level entries ARE prefixed "ESA-Mission2/" --
+       confirmed via `unzip -v` and a real extraction of channels.csv, e.g.
+       "ESA-Mission2/channels.csv", "ESA-Mission2/channels/channel_1.zip".
+       So extracting to UNPACK_DIR.parent (not UNPACK_DIR itself) is what
+       lands files at the paths aksha_core/data/mission2.py's data_root()
+       expects -- the opposite of what the ESA-Mission1 sibling directory's
+       flat layout implied. That sibling was apparently extracted with the
+       leading folder stripped by whoever built it; the raw archive is not
+       flat.
     """
     if UNPACK_DIR.exists() and any(UNPACK_DIR.iterdir()):
         print(f"{UNPACK_DIR}: already populated, skipping unzip")
         return
 
+    with zipfile.ZipFile(zip_path) as z:
+        members = z.infolist()
+        total_uncompressed = sum(m.file_size for m in members)
+    print(f"{len(members)} entries, {total_uncompressed / 1e9:.2f} GB uncompressed")
+
     free_bytes = shutil.disk_usage(DATA_DIR).free
-    # The zip is compressed pickles; unpacked size is not published by Zenodo,
-    # so this is a conservative floor, not a guarantee -- re-check if it fails.
-    if free_bytes < EXPECTED_SIZE * 2:
+    if free_bytes - total_uncompressed < MIN_FREE_BYTES:
         raise RuntimeError(
-            f"only {free_bytes / 1e9:.1f} GB free; unpacking a {EXPECTED_SIZE / 1e9:.1f} GB "
-            "zip needs headroom beyond the zip itself. Free up space and re-run "
-            "(the verified zip is kept, so this resumes at unzip)."
+            f"only {free_bytes / 1e9:.2f} GB free; extracting {total_uncompressed / 1e9:.2f} GB "
+            f"would leave less than the {MIN_FREE_BYTES / 1e9:.1f} GB safety floor. Free up space "
+            "and re-run (the verified zip is kept, so this resumes at unzip)."
         )
 
-    UNPACK_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"unzipping to {UNPACK_DIR} ...")
-    with zipfile.ZipFile(zip_path) as z:
-        z.extractall(UNPACK_DIR)
+    UNPACK_DIR.parent.mkdir(parents=True, exist_ok=True)
+    print(f"unzipping to {UNPACK_DIR.parent} (system unzip, handles Deflate64) ...")
+    subprocess.run(["unzip", "-q", "-o", str(zip_path), "-d", str(UNPACK_DIR.parent)], check=True)
     print(f"unpacked: {UNPACK_DIR}")
 
 
