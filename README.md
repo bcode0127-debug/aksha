@@ -17,7 +17,9 @@ stream, no human in the loop for routine cases.
 
 ## Architecture
 
-![AKSHA architecture](docs/architecture.svg)
+![AKSHA architecture overview](docs/architecture-overview.svg)
+
+Detailed graph, generated from the live `Workflow.graph.edges`: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 Two Cloud Run services on a two-topic split-queue: **detector-service** (fast
 path, ms-scale — IForest + split conformal, deterministic, no LLM) publishes
@@ -26,13 +28,7 @@ detect, investigate, explain, file_report, route — as a real ADK 2 `Workflow`
 graph with two Gemini agent nodes and dict-edge routers. The **deterministic
 gate** (`verification_gate`) decides `confirm` / `disputed` / `reject` from
 calibrated distance alone; the LLM's read is recorded for audit but never
-touches the routing outcome. The diagram above is generated straight from the
-live `Workflow.graph.edges` object (`scripts/render_diagram.py`), not
-hand-drawn — rename a node and this changes with it (ADR-013). Regenerate
-with:
-```
-python3 scripts/render_diagram.py
-```
+touches the routing outcome.
 
 Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
 

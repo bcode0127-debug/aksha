@@ -1,6 +1,6 @@
 digraph aksha_triage_architecture {
 	fontname=Helvetica fontsize=20 label="AKSHA -- detect-to-route triage pipeline
-(generated from Workflow.graph.edges -- ADR-013)" labelloc=t rankdir=TB
+(generated from Workflow.graph.edges -- ADR-013)" labelloc=t rankdir=LR
 	node [fontname=Helvetica fontsize=11]
 	compound=true
 	subgraph cluster_detector {

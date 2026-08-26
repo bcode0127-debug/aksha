@@ -1,0 +1,26 @@
+digraph aksha_overview {
+	fontname=Helvetica fontsize=20 label="AKSHA -- overview
+(hand-specified abstraction; ground truth: docs/ARCHITECTURE.md)" labelloc=t rankdir=LR
+	node [fontname=Helvetica fontsize=12]
+	telemetry [label="Telemetry
+(ESA-ADB Mission2)" fillcolor="#EDE3FF" fontname="Helvetica-Bold" fontsize=13 shape=box style="filled,rounded"]
+	topic_in [label="Pub/Sub
+telemetry-in" fillcolor="#D8F5D0" fontname="Helvetica-Oblique" fontsize=11 shape=component style=filled]
+	detector [label="detector-service (Cloud Run)
+IForest + split conformal" fillcolor="#CFE8FF" fontname="Helvetica-Bold" fontsize=13 penwidth=2 shape=box style="filled,rounded"]
+	topic_triage [label="Pub/Sub
+triage" fillcolor="#D8F5D0" fontname="Helvetica-Oblique" fontsize=11 shape=component style=filled]
+	triage [label="triage-service (Cloud Run)
+ADK graph: Gemini investigates
+-> calibrated gate decides -> severity routes" fillcolor="#CFE8FF" fontname="Helvetica-Bold" fontsize=13 penwidth=2 shape=box style="filled,rounded"]
+	firestore [label="Firestore
+(incidents + traces)" fillcolor="#E3E3E3" fontname="Helvetica-Oblique" fontsize=11 shape=cylinder style=filled]
+	slack [label="Slack
+(3 on-call tiers)" fillcolor="#EDE3FF" fontname="Helvetica-Bold" fontsize=13 shape=box style="filled,rounded"]
+	telemetry -> topic_in [color="#555555" penwidth=1.5]
+	topic_in -> detector [color="#555555" penwidth=1.5]
+	detector -> topic_triage [color="#555555" penwidth=1.5]
+	topic_triage -> triage [color="#555555" penwidth=1.5]
+	triage -> firestore [color="#555555" penwidth=1.5]
+	firestore -> slack [color="#555555" penwidth=1.5]
+}

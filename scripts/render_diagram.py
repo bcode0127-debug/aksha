@@ -21,7 +21,13 @@ SECRET_IDS), not invented. They're visually distinct (dotted, grey) so it's
 never ambiguous which part of the picture is graph-derived and which is
 placed by hand.
 
-    python3 scripts/render_diagram.py                        # writes docs/architecture.svg + .dot
+Also renders a second, SEPARATE diagram: a 7-box overview
+(docs/architecture-overview.svg). Unlike the detailed one, this is hand-
+specified, not derived from graph.edges -- a deliberate abstraction for a
+reader who wants the one-sentence version, not a replacement for the ground
+truth. See docs/ARCHITECTURE.md for which is which.
+
+    python3 scripts/render_diagram.py                        # writes both diagrams
     python3 scripts/render_diagram.py --out /tmp/arch.png --format png
 """
 from __future__ import annotations
@@ -38,6 +44,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 DEFAULT_OUT = REPO_ROOT / "docs" / "architecture"
+DEFAULT_OVERVIEW_OUT = REPO_ROOT / "docs" / "architecture-overview"
 
 
 def _load_dump_graph():
@@ -65,6 +72,54 @@ PLAIN_EDGE = {"color": "#555555"}
 INFRA_EDGE = {"style": "dotted", "color": "#777777", "fontcolor": "#777777", "fontsize": "10", "constraint": "false"}
 
 
+ENDPOINT_STYLE = {"shape": "box", "style": "filled,rounded", "fillcolor": "#EDE3FF", "fontname": "Helvetica-Bold", "fontsize": "13"}
+SERVICE_BOX_STYLE = {"shape": "box", "style": "filled,rounded", "fillcolor": "#CFE8FF", "penwidth": "2", "fontname": "Helvetica-Bold", "fontsize": "13"}
+OVERVIEW_EDGE = {"color": "#555555", "penwidth": "1.5"}
+
+
+OVERVIEW_NODES = ("telemetry", "topic_in", "detector", "topic_triage", "triage", "firestore", "slack")
+OVERVIEW_EDGES = (
+    ("telemetry", "topic_in"), ("topic_in", "detector"), ("detector", "topic_triage"),
+    ("topic_triage", "triage"), ("triage", "firestore"), ("firestore", "slack"),
+)
+
+
+def build_overview_graph() -> graphviz.Digraph:
+    """The 7-box, one-glance version. Hand-specified, not derived from
+    graph.edges -- this is a deliberate abstraction (see module docstring
+    and docs/ARCHITECTURE.md), not a second source of truth. If it drifts
+    from what build_graph() actually renders, this one is wrong, not that
+    one.
+    """
+    g = graphviz.Digraph("aksha_overview", format="svg")
+    g.attr(rankdir="LR", fontname="Helvetica", labelloc="t", fontsize="20",
+           label="AKSHA -- overview\n(hand-specified abstraction; ground truth: docs/ARCHITECTURE.md)")
+    g.attr("node", fontname="Helvetica", fontsize="12")
+
+    g.node("telemetry", "Telemetry\n(ESA-ADB Mission2)", **ENDPOINT_STYLE)
+    g.node("topic_in", "Pub/Sub\ntelemetry-in", **TOPIC_STYLE)
+    g.node("detector", "detector-service (Cloud Run)\nIForest + split conformal", **SERVICE_BOX_STYLE)
+    g.node("topic_triage", "Pub/Sub\ntriage", **TOPIC_STYLE)
+    g.node(
+        "triage",
+        "triage-service (Cloud Run)\nADK graph: Gemini investigates\n"
+        "-> calibrated gate decides -> severity routes",
+        **SERVICE_BOX_STYLE,
+    )
+    g.node("firestore", "Firestore\n(incidents + traces)", **INFRA_STYLE)
+    g.node("slack", "Slack\n(3 on-call tiers)", **ENDPOINT_STYLE)
+
+    # One straight chain, as specified -- not a fork, even though Firestore
+    # writes and Slack delivery are actually two independent effects of
+    # triage-service in the real graph (see the detailed diagram). This is
+    # the deliberate abstraction: a reader's one-glance mental model of the
+    # data's path, not a literal call graph.
+    for src, dst in OVERVIEW_EDGES:
+        g.edge(src, dst, **OVERVIEW_EDGE)
+
+    return g
+
+
 def router_names(edges: list[dict]) -> set[str]:
     """A node is a router if any of its outgoing edges carries a route label."""
     return {e["from"] for e in edges if e["route"] is not None}
@@ -74,7 +129,7 @@ def build_graph(nodes: dict, edges: list, default_route_value) -> graphviz.Digra
     routers = router_names(edges)
 
     g = graphviz.Digraph("aksha_triage_architecture", format="svg")
-    g.attr(rankdir="TB", fontname="Helvetica", labelloc="t", fontsize="20",
+    g.attr(rankdir="LR", fontname="Helvetica", labelloc="t", fontsize="20",
            label="AKSHA -- detect-to-route triage pipeline\n(generated from Workflow.graph.edges -- ADR-013)")
     g.attr("node", fontname="Helvetica", fontsize="11")
     g.attr(compound="true")
@@ -138,8 +193,10 @@ def build_graph(nodes: dict, edges: list, default_route_value) -> graphviz.Digra
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", default=str(DEFAULT_OUT), help="output path stem (no extension)")
+    parser.add_argument("--out", default=str(DEFAULT_OUT), help="detailed diagram output path stem (no extension)")
+    parser.add_argument("--overview-out", default=str(DEFAULT_OVERVIEW_OUT), help="overview diagram output path stem")
     parser.add_argument("--format", default="svg", choices=["svg", "png"])
+    parser.add_argument("--skip-overview", action="store_true", help="render only the detailed diagram")
     args = parser.parse_args()
 
     dg = _load_dump_graph()
@@ -161,14 +218,27 @@ def main() -> int:
     dot_path = out.with_suffix(".dot")
     dot_path.write_text(g.source)
     rendered = g.render(filename=str(out), cleanup=True)
-    print(f"dot source : {dot_path}")
-    print(f"rendered   : {rendered}")
+    print(f"detailed dot source : {dot_path}")
+    print(f"detailed rendered   : {rendered}")
 
     routers = router_names(edges)
     agents = [n for n in nodes.values() if n["is_agent"]]
     defaults = [e for e in edges if e["route"] == DEFAULT_ROUTE]
-    print(f"\nnodes={len(nodes)} edges={len(edges)} agents={len(agents)} "
+    print(f"detailed: nodes={len(nodes)} edges={len(edges)} agents={len(agents)} "
           f"routers={sorted(routers)} default_route_edges={len(defaults)}")
+
+    if not args.skip_overview:
+        og = build_overview_graph()
+        oout = Path(args.overview_out)
+        oout.parent.mkdir(parents=True, exist_ok=True)
+        og.format = args.format
+        odot_path = oout.with_suffix(".dot")
+        odot_path.write_text(og.source)
+        orendered = og.render(filename=str(oout), cleanup=True)
+        print(f"\noverview dot source : {odot_path}")
+        print(f"overview rendered   : {orendered}")
+        print(f"overview: nodes={len(OVERVIEW_NODES)} edges={len(OVERVIEW_EDGES)}")
+
     return 0
 
 
