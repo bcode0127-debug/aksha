@@ -4,7 +4,7 @@
 Every measurement so far drew a fresh random sample, which makes two attempts
 incomparable: a change in the numbers could be the change in the design or the
 change in the sample, and there is no way to tell which. The golden set removes
-that ambiguity — it is committed, it never resamples, and a future attempt is
+that ambiguity -- it is committed, it never resamples, and a future attempt is
 measured against exactly the windows this one was.
 
 WHAT GOES IN, and why each group
@@ -13,11 +13,11 @@ WHAT GOES IN, and why each group
                    Missing one of these is the expensive failure.
   clear_expected : true rare events well below it. Confirming one of these
                    wakes an operator for routine behaviour.
-  clear_nominal  : detector-flagged nominal windows — the false alarms the
+  clear_nominal  : detector-flagged nominal windows -- the false alarms the
                    verifier exists to absorb.
   ambiguous      : windows inside the gate's calibrated ambiguous band. The
                    gate returns `disputed` for these BY CONSTRUCTION, so they
-                   carry NO expected verdict — scoring them would be scoring
+                   carry NO expected verdict -- scoring them would be scoring
                    the band's definition against itself. They are here so that
                    how much decision the band absorbs stays visible.
 
@@ -27,7 +27,7 @@ retrieval material.
 
 FAULTS ARE THE EXCEPTION, and the reason is worth stating plainly. The test
 split contains exactly one distinct anomaly event, and both of its
-detector-flagged windows sit BELOW the gate's distance threshold — the gate
+detector-flagged windows sit BELOW the gate's distance threshold -- the gate
 rejects them. So the test split cannot supply a single "clear fault", and a
 golden set built only from it would measure everything except the failure that
 matters most. Clear faults are therefore drawn from the held-out train-period
@@ -202,7 +202,7 @@ def main() -> int:
         "ambiguous_band": [round(lo, 4), round(hi, 4)],
         "band_source": "aksha_core/artifacts/mission2_recognition_calibration.json",
         "note": (
-            "Fixed set. Do not resample — its purpose is that two evaluation runs "
+            "Fixed set. Do not resample -- its purpose is that two evaluation runs "
             "measure the same windows. `ambiguous` entries have no expected verdict."
         ),
         "windows": entries,

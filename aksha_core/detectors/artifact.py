@@ -75,7 +75,7 @@ class DetectorArtifact:
     ) -> pd.DataFrame:
         """Score a feature table. Returns score, threshold and conformal_p.
 
-        `conformal_p` is LOW for anomalous windows — see
+        `conformal_p` is LOW for anomalous windows -- see
         `aksha_core.conformal.split` for the direction and the guarantee.
         """
         epsilon = DEFAULT_EPSILON if epsilon is None else epsilon
@@ -167,7 +167,7 @@ class DetectorArtifact:
             # numerical stack behind a pickled model is how they stop being
             # identical without anyone noticing, so it is said out loud.
             logger.warning(
-                "detector %s was fitted against %s but is running against %s — "
+                "detector %s was fitted against %s but is running against %s -- "
                 "scores are not guaranteed to reproduce; pin the versions",
                 blob["detector_version"],
                 {k: v[0] for k, v in drifted.items()},

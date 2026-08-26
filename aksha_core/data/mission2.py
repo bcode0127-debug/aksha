@@ -17,7 +17,7 @@ Sourced from ESA-ADB's own repository code
   * the lightweight channel subset 18-28 (`mission2_experiments.py`,
     `subset_channels`)
 
-OUR CHOICES — not sourced from the benchmark or any paper, and to be re-argued
+OUR CHOICES -- not sourced from the benchmark or any paper, and to be re-argued
 if they ever get load-bearing:
 
   * WINDOW = 1 hour, fixed-time, NON-OVERLAPPING. Non-overlapping is
@@ -88,7 +88,7 @@ _NS_PER_S = 1_000_000_000
 def data_root(explicit: str | os.PathLike | None = None) -> Path:
     """Resolve the Mission2 directory: explicit arg, then env var, then default.
 
-    Never a hardcoded absolute path — the default is expanded at call time so a
+    Never a hardcoded absolute path -- the default is expanded at call time so a
     different machine can point `AKSHA_MISSION2_DIR` somewhere else.
     """
     raw = explicit or os.environ.get(ENV_DATA_ROOT) or DEFAULT_DATA_ROOT
@@ -99,7 +99,7 @@ def data_root(explicit: str | os.PathLike | None = None) -> Path:
 
 
 def load_channel(name: str, root: str | os.PathLike | None = None) -> pd.Series:
-    """Load one channel's raw series. Lazy by design — callers iterate channels
+    """Load one channel's raw series. Lazy by design -- callers iterate channels
     one at a time so the full 100-channel set is never resident.
     """
     path = data_root(root) / "channels" / f"{name}.zip"
@@ -228,7 +228,7 @@ def _peak_count(x: np.ndarray) -> int:
 def series_features(x: np.ndarray) -> dict:
     """Features on the resampled series.
 
-    Skew and kurtosis are undefined for a constant series — scipy returns NaN
+    Skew and kurtosis are undefined for a constant series -- scipy returns NaN
     and warns. A channel holding a fixed setpoint for an hour is ordinary in
     telemetry, so those windows are real data, not errors; they are reported as
     0.0 (no asymmetry, no excess tail) rather than allowed to put NaN into the
@@ -318,7 +318,7 @@ def command_features(tc_times_ns: np.ndarray, grid: pd.DatetimeIndex) -> pd.Data
     inside the window. No decay term.
 
     `seconds_since_last_tc` is NaN before the first telecommand on record, not 0
-    or a sentinel — "no command has ever been sent" is not a small elapsed time.
+    or a sentinel -- "no command has ever been sent" is not a small elapsed time.
     """
     starts_ns = grid.to_numpy(dtype="datetime64[ns]").astype("int64")
     ends_ns = starts_ns + WINDOW.value
@@ -347,8 +347,8 @@ def mahalanobis_distances(means: pd.DataFrame, fit_mask: np.ndarray) -> pd.Serie
     """Mahalanobis distance of each window's 11-channel mean vector, against a
     mean and covariance fitted on `fit_mask` rows only (the training block).
 
-    Uses the pseudo-inverse so a singular or near-singular covariance — likely
-    with tightly coupled channels — degrades rather than raising.
+    Uses the pseudo-inverse so a singular or near-singular covariance -- likely
+    with tightly coupled channels -- degrades rather than raising.
     """
     matrix = means.to_numpy(dtype="float64")
     complete = ~np.isnan(matrix).any(axis=1)
@@ -377,7 +377,7 @@ def assign_labels(
     """Label each (window, channel) row by time overlap with `labels`.
 
     A labelled interval applies when it covers at least `min_overlap` of the
-    window. Where both categories qualify, anomaly wins over rare_event —
+    window. Where both categories qualify, anomaly wins over rare_event --
     the more severe call is the safer one to surface.
     """
     category_to_label = {"Anomaly": "anomaly", "Rare Event": "rare_event"}

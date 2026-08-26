@@ -4,7 +4,7 @@ the pinned Zenodo record's published checksums.
 
 Pinned record: 10.5281/zenodo.15108715 (latest version as of the fetch script
 being written; the concept DOI 10.5281/zenodo.12588358 may point elsewhere
-by the time you read this — re-verify before repinning).
+by the time you read this -- re-verify before repinning).
 """
 import hashlib
 import sys
@@ -52,7 +52,7 @@ def fetch(filename: str, expected_md5: str) -> None:
     if actual_md5 != expected_md5:
         tmp.unlink()
         raise RuntimeError(
-            f"{filename}: checksum mismatch — expected {expected_md5}, got {actual_md5}. "
+            f"{filename}: checksum mismatch -- expected {expected_md5}, got {actual_md5}. "
             "Download discarded."
         )
 
@@ -70,5 +70,5 @@ if __name__ == "__main__":
     try:
         main()
     except (requests.RequestException, RuntimeError) as exc:
-        print(f"fetch_data.py: FAILED — {exc}", file=sys.stderr)
+        print(f"fetch_data.py: FAILED -- {exc}", file=sys.stderr)
         sys.exit(1)

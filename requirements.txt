@@ -1,5 +1,5 @@
 # --- aksha_core (detectors, conformal calibration, data, utils) ---
-# No google/ADK/vertexai imports allowed in this section's consumers — see CLAUDE.md.
+# No google/ADK/vertexai imports allowed in this section's consumers -- see CLAUDE.md.
 numpy
 pandas
 scipy

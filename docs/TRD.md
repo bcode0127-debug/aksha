@@ -1,4 +1,4 @@
-# AKSHA — TRD v0.4
+# AKSHA -- TRD v0.4
 *Aug 11, 2026. Status: locked.*
 
 **1. Pipeline (two-topic split-queue)**
@@ -23,7 +23,7 @@ Mission2 fragments (ESA-ADB; see ADR-015)
 
 LLM latency never gates a broker ack. Both subscriptions carry dead-letter topics (5 delivery attempts). All workers idempotent under at-least-once delivery. Flip threshold: if per-incident LLM latency approaches 600s, move the triage leg to pull with lease extension or Cloud Tasks (ADR-011).
 
-Measured: ADK 2 spike single-LLM-call wall time was 14.7–38.8s (tutorial marathon-strategy workflow, AI Studio backend, Aug 13 2026). A two-call incident (investigate + explain) sits far under the 600s ack ceiling — the flip threshold above stays theoretical for now.
+Measured: ADK 2 spike single-LLM-call wall time was 14.7–38.8s (tutorial marathon-strategy workflow, AI Studio backend, Aug 13 2026). A two-call incident (investigate + explain) sits far under the 600s ack ceiling -- the flip threshold above stays theoretical for now.
 
 **2. Module boundary**
 
@@ -53,13 +53,13 @@ Gated stretch: autoencoder on raw signals from `segments.csv` (genuinely differe
 
 Five stages: 2 agent nodes, 3 function nodes. Every boundary validated by `input_schema`.
 
-- **detect** — function node, 0 LLM. IForest + split conformal (section 4)
-- **investigate** — agent node, Gemini 3.5 Flash, `mode="single_turn"`. Outputs hypothesis, implicated channel, evidence refs, confidence
-- **assemble_explainer_input** — function node, 0 LLM. Builds the explainer's input as DetectionResult + evidence + hypothesis, dropping investigator_confidence. This is the mechanism that enforces ADR-005: isolation is an edge in the graph, visible in `Workflow.graph.edges`
-- **explain** — agent node, `mode="single_turn"`, separate call, `temperature=0.0`. Outputs the operator-facing `reason` plus an independent `status` that is RECORDED FOR AUDIT ONLY. It cannot change the verdict
-- **verification_gate** — function node, 0 LLM. The decision. Compares the calibrated distance against bounds loaded from the calibration artifact: `>= band.high` → confirm, `<= band.low` → reject, otherwise → disputed
-- **file_report** — function node, 0 LLM. Deterministic assembly, computes severity
-- **route** — dict-edge router on severity, writes routing outcome back
+- **detect** -- function node, 0 LLM. IForest + split conformal (section 4)
+- **investigate** -- agent node, Gemini 3.5 Flash, `mode="single_turn"`. Outputs hypothesis, implicated channel, evidence refs, confidence
+- **assemble_explainer_input** -- function node, 0 LLM. Builds the explainer's input as DetectionResult + evidence + hypothesis, dropping investigator_confidence. This is the mechanism that enforces ADR-005: isolation is an edge in the graph, visible in `Workflow.graph.edges`
+- **explain** -- agent node, `mode="single_turn"`, separate call, `temperature=0.0`. Outputs the operator-facing `reason` plus an independent `status` that is RECORDED FOR AUDIT ONLY. It cannot change the verdict
+- **verification_gate** -- function node, 0 LLM. The decision. Compares the calibrated distance against bounds loaded from the calibration artifact: `>= band.high` → confirm, `<= band.low` → reject, otherwise → disputed
+- **file_report** -- function node, 0 LLM. Deterministic assembly, computes severity
+- **route** -- dict-edge router on severity, writes routing outcome back
 
 Two dict-edge routers: gate verdict (reject and disputed → log, never escalate) and severity (3 destinations). Both carry DEFAULT_ROUTE (section 9). Two LLM calls per incident, total. Node names are part of the routing contract; any rename greps all docs same day.
 
@@ -89,13 +89,13 @@ Critical → flight director. Caution → subsystem engineer. Advisory → log o
 
 Firestore: `incidents/{id}`, `traces/{incident_id}/steps/{n}`, `runs/{run_id}`. Every agent step appends a trace doc: audit trail and dashboard drill-down in one structure. No in-process session state; both services scale to zero. Idempotency key `fragment_id + detector_version` checked before any write.
 
-No node-level callbacks exist in ADK (ADR-013 spike) — model-level plugin hooks (`before_model_callback`/`after_model_callback`) cover the two LLM nodes' side of tracing; function nodes append their trace docs explicitly in code, not via a framework hook.
+No node-level callbacks exist in ADK (ADR-013 spike) -- model-level plugin hooks (`before_model_callback`/`after_model_callback`) cover the two LLM nodes' side of tracing; function nodes append their trace docs explicitly in code, not via a framework hook.
 
 **9. Failure handling**
 
 - **Unmatched route** → both route dicts carry a DEFAULT_ROUTE entry to the log tier with the incident flagged as a routing anomaly. Invariant: no incident leaves the graph unrecorded. Without this, an unmatched route ends the branch silently and the process exits 0 with no output (confirmed empirically, ADR-013 spike)
-- **Malformed LLM output** → `input_schema` validates a node's *input*, not the output of the node that produced it — so a bad LLM output doesn't fail where it was generated, it surfaces as a `pydantic.ValidationError` at the *next* node's input gate (ADR-013 spike). Node-level retry cannot repair this: it's a deterministic failure, not a transient one (ADR-014). Policy: fail fast, no repair loop, deterministic fallback marked `llm_unavailable`
-- **Retry policy** (ADR-014) → `retry_config` enabled only on the two LLM nodes (investigate, explain), `exceptions` allowlist limited to transient transport failures and `NodeTimeoutError`. Function nodes carry no `retry_config` — a failure there is a bug, not a transient condition
+- **Malformed LLM output** → `input_schema` validates a node's *input*, not the output of the node that produced it -- so a bad LLM output doesn't fail where it was generated, it surfaces as a `pydantic.ValidationError` at the *next* node's input gate (ADR-013 spike). Node-level retry cannot repair this: it's a deterministic failure, not a transient one (ADR-014). Policy: fail fast, no repair loop, deterministic fallback marked `llm_unavailable`
+- **Retry policy** (ADR-014) → `retry_config` enabled only on the two LLM nodes (investigate, explain), `exceptions` allowlist limited to transient transport failures and `NodeTimeoutError`. Function nodes carry no `retry_config` -- a failure there is a bug, not a transient condition
 - Calibrated distance inside the ambiguous band → `disputed`, log tier, no escalation. Gate/explainer disagreement is recorded for audit and does NOT affect the outcome
 - Vertex timeout or quota → per-node `timeout` raises `NodeTimeoutError`, which is retry-compatible (ADR-014); exponential backoff, then dead-letter once retries exhaust
 - Pub/Sub redelivery → idempotency key check

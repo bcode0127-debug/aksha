@@ -5,7 +5,7 @@
 # Dockerfile at its root, but the service imports `aksha_core` and loads the
 # committed detector artifact, both of which live above the service folder.
 # So this stages exactly what the image needs into a temp directory and builds
-# from there — explicit about what ships, rather than sending the whole repo.
+# from there -- explicit about what ships, rather than sending the whole repo.
 #
 # Usage:  scripts/deploy_detector.sh [PROJECT_ID] [REGION]
 set -euo pipefail

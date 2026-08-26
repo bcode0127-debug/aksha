@@ -1,7 +1,7 @@
 """Tests for the Mission2 adapter.
 
 These exercise the four properties the adapter's correctness actually rests on,
-with synthetic data — no dataset needed, so they run in CI without the 3.8 GB
+with synthetic data -- no dataset needed, so they run in CI without the 3.8 GB
 Mission2 download.
 """
 from __future__ import annotations
@@ -132,7 +132,7 @@ def test_label_overlap_exactly_at_threshold_is_applied():
 
 
 def test_label_overlap_is_clipped_to_the_window():
-    """A label far longer than the window still only counts its intersection —
+    """A label far longer than the window still only counts its intersection --
     and a label that misses the window entirely never applies.
     """
     inside = m2.assign_labels(_one_window_frame(), _label(-7200, 100_000))

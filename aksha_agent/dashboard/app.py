@@ -269,12 +269,12 @@ def render_decision_pane(incident: dict) -> None:
         f"**Severity:** {badge_html(severity, SEVERITY_STYLE)}",
         unsafe_allow_html=True,
     )
-    st.markdown(f"**Routed to:** `{incident.get('routing_destination', '—')}`  "
-                f"&middot; **Delivery:** `{incident.get('routing_outcome', '—')}`")
+    st.markdown(f"**Routed to:** `{incident.get('routing_destination', '--')}`  "
+                f"&middot; **Delivery:** `{incident.get('routing_outcome', '--')}`")
 
     reason = incident.get("llm_reason") or "(no reason recorded)"
     st.markdown(
-        f'<div class="aksha-audit">model read — audit only, not applied: '
+        f'<div class="aksha-audit">model read -- audit only, not applied: '
         f"<b>{llm_verdict or 'n/a'}</b> &mdash; {reason}</div>",
         unsafe_allow_html=True,
     )
@@ -282,7 +282,7 @@ def render_decision_pane(incident: dict) -> None:
     disagree = gate_verdict is not None and llm_verdict is not None and gate_verdict != llm_verdict
     if disagree:
         st.markdown(
-            f'<div class="aksha-disagree">⚠ DISAGREEMENT — gate: '
+            f'<div class="aksha-disagree">⚠ DISAGREEMENT -- gate: '
             f'<b>{VERDICT_STYLE.get(gate_verdict, NO_DATA_STYLE)["symbol"]} {gate_verdict}</b>, '
             f'model: <b>{llm_verdict}</b>. Gate\'s verdict routed; model\'s read is audit only.</div>',
             unsafe_allow_html=True,
@@ -310,11 +310,11 @@ def render_incident_strip(incidents: list[dict], selected_id: str | None) -> Non
         cols = st.columns([1.8, 1.0, 1.0, 1.0, 1.3, 0.7])
         is_selected = incident["_id"] == selected_id
         prefix = "▶ " if is_selected else ""
-        cols[0].markdown(f"{prefix}{incident.get('timestamp_utc', '—')}")
-        cols[1].markdown(str(incident.get("channel_id", "—")))
+        cols[0].markdown(f"{prefix}{incident.get('timestamp_utc', '--')}")
+        cols[1].markdown(str(incident.get("channel_id", "--")))
         cols[2].markdown(badge_html(incident.get("severity"), SEVERITY_STYLE), unsafe_allow_html=True)
         cols[3].markdown(badge_html(incident.get("final_verdict"), VERDICT_STYLE), unsafe_allow_html=True)
-        cols[4].markdown(str(incident.get("routing_destination", "—")))
+        cols[4].markdown(str(incident.get("routing_destination", "--")))
         if cols[5].button("Load", key=f"select_{incident['_id']}", disabled=is_selected):
             st.session_state["selected_incident"] = incident["_id"]
             st.rerun()
@@ -336,7 +336,7 @@ def main() -> None:
     inject_css()
     plt.rcParams.update({"text.color": FG, "axes.edgecolor": GRID, "axes.labelcolor": MUTED})
 
-    st.title("AKSHA — telemetry triage console")
+    st.title("AKSHA -- telemetry triage console")
     st.caption(f"Firestore project: `{PROJECT_ID}` · read-only · refreshes every 30s")
 
     incidents = load_incidents(INCIDENT_LIMIT)

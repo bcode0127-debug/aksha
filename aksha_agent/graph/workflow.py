@@ -39,8 +39,8 @@ WHAT THE SPIKE ESTABLISHED (ADR-013), and what this file relies on:
 
 MODELS come from the environment and must be Gemini 3.5 or newer (CLAUDE.md).
 Verified against Vertex in this project: `gemini-3.5-flash` and
-`gemini-3.5-flash-lite` exist only on the **global** endpoint — every regional
-endpoint 404s for them — so `GOOGLE_CLOUD_LOCATION` must be `global`.
+`gemini-3.5-flash-lite` exist only on the **global** endpoint -- every regional
+endpoint 404s for them -- so `GOOGLE_CLOUD_LOCATION` must be `global`.
 """
 from __future__ import annotations
 
@@ -122,7 +122,7 @@ def explainer_model() -> str:
 # ADK matches this allowlist against bare `type(exception).__name__`, verified
 # in-session against google-adk 2.3.0.
 #
-# `ServerError` is google-genai's 5xx — the spike hit a real 503 UNAVAILABLE on
+# `ServerError` is google-genai's 5xx -- the spike hit a real 503 UNAVAILABLE on
 # its first run, which a plain re-run cleared. `NodeTimeoutError` is documented
 # by ADK as retry-compatible.
 #
@@ -153,7 +153,7 @@ AGENT_TIMEOUT_SECONDS = 120.0
 # evidence is a defect in its own right, independent of which way it leans.
 #
 # Applied to the EXPLAIN node only, per the packet. The investigator is still
-# sampled, so the pipeline is not fully deterministic end to end — its
+# sampled, so the pipeline is not fully deterministic end to end -- its
 # hypothesis feeds the explainer, and that residual is reported rather than
 # hidden.
 def _deterministic_config():
@@ -180,7 +180,7 @@ def _deterministic_config():
 #
 # An earlier revision let the model escalate a gate-reject to `disputed`. That
 # is removed. It made `disputed` mean "the model disagreed", which on the test
-# split fired on 33/62 windows and stopped the gate absorbing false alarms —
+# split fired on 33/62 windows and stopped the gate absorbing false alarms --
 # and it made the outcome depend on model behaviour that the eight-run
 # repeatability check is too small to bound. `disputed` now means one thing
 # only, and it is a property of the distance:
@@ -241,7 +241,7 @@ def compute_severity(
     """Deterministic severity. No model call, no randomness.
 
     A rejected or disputed verdict never escalates (ADR-005). `disputed` now
-    means the calibrated distance fell inside the band and did not decide —
+    means the calibrated distance fell inside the band and did not decide --
     which is a reason to log and let a human look, not a reason to wake one.
     """
     if final_verdict in (Verdict.REJECT, Verdict.DISPUTED):
@@ -320,7 +320,7 @@ each before settling:
 - gap_artifact: missing data explains the shape. Look at gap_fraction and
   max_gap_seconds.
 - isolated_deviation: this channel alone departs from its history, and none of
-  the above explains it. Do not pick this by default — pick it when you have
+  the above explains it. Do not pick this by default -- pick it when you have
   ruled the others out.
 - sensor_noise: within plausible noise for this channel.
 
@@ -347,7 +347,7 @@ nearest previously-labelled rare event on this channel, in standardised units.
 distances that labelled rare events themselves exhibit.
 
 Read this as OUTLIERNESS, not as resemblance. A small distance does NOT mean the
-window is a known rare event — routine nominal windows are on average the
+window is a known rare event -- routine nominal windows are on average the
 closest of all to rare-event exemplars, because they are unremarkable in every
 direction. What the distance tracks is how far out on the tail a window sits:
 larger means further from anything previously recorded, and that is what
@@ -505,7 +505,7 @@ def build_workflow(
         """Decide from the calibrated distance. Record the model's opinion.
 
         Runs AFTER `explain` so the model's independent read is available to
-        write down — but nothing the model returns is consulted in reaching the
+        write down -- but nothing the model returns is consulted in reaching the
         verdict. `gate_verdict()` takes no LLM argument at all.
         """
         raw_status = node_input.get("status")
@@ -578,7 +578,7 @@ def build_workflow(
         """Route on the gate's verdict, tolerating one it does not recognise.
 
         The gate emits a `Verdict` member, so an unrecognised value
-        should now be impossible — this used to guard against a model returning
+        should now be impossible -- this used to guard against a model returning
         something off-enum, and the model no longer supplies the routed value
         at all. It is kept because raising here would fail the node, 500 the
         request, and lose the incident on redelivery, which is strictly worse
@@ -591,7 +591,7 @@ def build_workflow(
         status = raw_status if isinstance(raw_status, str) else str(raw_status)
         reason = node_input.get("reason") or ""
         # The explainer returning an off-enum status is an audit fact, not a
-        # routing fault — it cannot reach the route any more. Only a bad GATE
+        # routing fault -- it cannot reach the route any more. Only a bad GATE
         # verdict is a routing anomaly.
         anomalous = status not in known_statuses
         if anomalous:
@@ -684,8 +684,8 @@ def build_workflow(
     # Each gate verdict gets its OWN node rather than sharing one. ADK
     # rejects duplicate edges between the same pair of nodes, so a single
     # shared "log only" target cannot be reached from three route keys; and
-    # splitting them is the better shape anyway, because every outcome —
-    # including the unroutable one — is then visible as a distinct node in
+    # splitting them is the better shape anyway, because every outcome --
+    # including the unroutable one -- is then visible as a distinct node in
     # `Workflow.graph.edges`, and so in the generated diagram.
     def file_report(node_input):
         """Confirmed: severity computed from conformal_p, may escalate."""
@@ -700,7 +700,7 @@ def build_workflow(
         return _file(node_input, log_only=True, node_name="file_report_disputed", emit_route=False)
 
     def file_report_unroutable(node_input):
-        """Reached via DEFAULT_ROUTE — the gate emitted a verdict no branch
+        """Reached via DEFAULT_ROUTE -- the gate emitted a verdict no branch
         claims. The incident is still recorded and flagged; the ADR-013 spike
         showed the alternative is a branch that ends silently at exit code 0.
         """
@@ -711,7 +711,7 @@ def build_workflow(
         incident = dict(node_input)
         incident["routing_destination"] = destination.value
 
-        # Delivery is attempted, then RECORDED — never assumed. `deliver`
+        # Delivery is attempted, then RECORDED -- never assumed. `deliver`
         # returns a status rather than raising, so an outage marks the incident
         # `failed` and keeps it, instead of losing an incident the graph has
         # already spent two LLM calls reasoning about (TRD section 9).
@@ -761,7 +761,7 @@ def build_workflow(
             (assemble_explainer_input, explain),
             (explain, verification_gate),
             (verification_gate, route_by_status),
-            # Router 1: the gate's verdict. DEFAULT_ROUTE is load-bearing — without
+            # Router 1: the gate's verdict. DEFAULT_ROUTE is load-bearing -- without
             # it an unrecognised status ends the branch silently at exit code 0
             # (ADR-013). Every key needs a distinct target: ADK rejects
             # duplicate edges between the same node pair.

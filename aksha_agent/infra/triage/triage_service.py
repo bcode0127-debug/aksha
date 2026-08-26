@@ -1,4 +1,4 @@
-"""Triage service — slow path.
+"""Triage service -- slow path.
 
 Receives a Pub/Sub push envelope on `triage` (a DetectionResult) and runs the
 real triage graph: two Gemini agent nodes and seven function nodes
@@ -147,7 +147,7 @@ async def handle_push(request: Request) -> Response:
 
     if incident is None:
         # The graph produced no terminal incident. ADR-013 established this is
-        # exactly how an unmatched route fails — silently, with a clean exit —
+        # exactly how an unmatched route fails -- silently, with a clean exit --
         # so it is surfaced as a genuine failure and left for redelivery.
         logger.error(
             "triage produced no incident for %s after %.1fs (%d trace steps)",

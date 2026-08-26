@@ -1,4 +1,4 @@
-# Mission2 adapter — notes
+# Mission2 adapter -- notes
 
 What `aksha_core/data/mission2.py` produces, every choice that is ours rather
 than the benchmark's, and the numbers from the build. Facts and decisions; no
@@ -37,7 +37,7 @@ Dataset itself: Zenodo record `15237121`, DOI `10.5281/zenodo.15237121`,
 CC BY 3.0 IGO. Note the ESA-ADB paper and README both cite the older record
 `12528696`; this adapter reads the newer one.
 
-## Ours — to be re-argued if they become load-bearing
+## Ours -- to be re-argued if they become load-bearing
 
 **Window: 1 hour, fixed-time, non-overlapping.** Non-overlapping removes label
 leakage between neighbouring windows and guarantees no window straddles a split
@@ -45,8 +45,8 @@ boundary. Yields ~13.1k windows per channel in the training block.
 
 **`MAX_GAP_FRACTION = 0.20`.** A window whose raw timestamps leave more than 20%
 of its wall-clock hour uncovered is dropped rather than zero-order-held into
-existence. **On this data the filter is nearly inert** — see the drop rate
-below — because the 11 lightweight channels are densely and uniformly sampled.
+existence. **On this data the filter is nearly inert** -- see the drop rate
+below -- because the 11 lightweight channels are densely and uniformly sampled.
 The mechanism matters more than the value here; the value would need re-arguing
 on a sparser channel set.
 
@@ -56,7 +56,7 @@ it costs **no test anomaly windows at all**, and trades ~13% of test rare-event
 windows for that label cleanliness.
 
 **`GAP_MULTIPLE = 2.0`.** An inter-sample interval counts as a gap once it
-exceeds twice the nominal 18 s cadence — i.e. once at least one expected sample
+exceeds twice the nominal 18 s cadence -- i.e. once at least one expected sample
 is missing.
 
 **Anomaly outranks rare event** when both qualify for the same window.
@@ -70,7 +70,7 @@ fixed setpoint for an hour is ordinary telemetry; scipy returns NaN there, and
 NaN would propagate into the detector. Guarded by a relative-tolerance check
 plus a non-finite backstop.
 
-**`seconds_since_last_tc` is NaN before the first telecommand on record** — "no
+**`seconds_since_last_tc` is NaN before the first telecommand on record** -- "no
 command has ever been sent" is not a small elapsed time. 11 rows affected.
 
 ## Order of operations
@@ -102,7 +102,7 @@ Series (post-ZOH): `mean`, `std`, `var`, `skew`, `kurtosis`, `min`, `max`,
 `mean_abs_change`, `n_peaks`, `smooth_n_peaks`, `diff_peaks`, `diff_var`,
 `diff2_peaks`, `diff2_var`, `slope`.
 
-Cross-channel: `mahalanobis` — distance of the window's 11-channel mean vector,
+Cross-channel: `mahalanobis` -- distance of the window's 11-channel mean vector,
 mean and covariance fitted on the **training block only**, pseudo-inverse so a
 near-singular covariance degrades rather than raises.
 
@@ -124,7 +124,7 @@ Wall 141.9 s, peak RSS 782.6 MB.
 | **Drop rate** | **0.0065%** |
 
 All 11 channels have identical raw row counts (7,387,262) and identical drop
-counts — they share one sampling grid.
+counts -- they share one sampling grid.
 
 Mahalanobis defined for 30,646 / 30,646 windows (100%).
 
@@ -169,7 +169,7 @@ annotated anomaly event on 2001-12-14, touching three channels:
 | 2001-12-14 19:00:00 | channel_19 |
 | 2001-12-14 19:00:00 | channel_20 |
 
-This is a property of the dataset on this channel subset, not of the adapter —
+This is a property of the dataset on this channel subset, not of the adapter --
 the underlying `labels.csv` has exactly **one distinct anomaly ID** with a
 `StartTime` after 2001-10-01 on channels 18–28, and no choice of window size or
 overlap threshold creates more.
@@ -195,7 +195,7 @@ Pooling the two categories follows ESA-ADB's own benchmarking convention,
 verified in the paper (arXiv 2406.17826): *"There are no algorithms in ESA-ADB
 that can explicitly distinguish between anomalies and rare nominal events, so
 the results in Table 2 are presented for all events (excluding only
-communication gaps)."* Table 2's caption says the same — *"detection of all
+communication gaps)."* Table 2's caption says the same -- *"detection of all
 events (excluding communication gaps)"*. Their anomaly-only numbers are
 quarantined to Supplementary Table 9, for the same reason we would quarantine
 ours: too few positives to carry a headline.

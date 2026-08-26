@@ -9,7 +9,7 @@
 # GOOGLE_CLOUD_LOCATION is `global`, NOT the Cloud Run region. Verified against
 # Vertex in this project: gemini-3.5-flash and gemini-3.5-flash-lite exist only
 # on the global endpoint and 404 on every regional one. The two settings are
-# independent — the container still runs in us-central1.
+# independent -- the container still runs in us-central1.
 #
 # Usage:  scripts/deploy_triage.sh [PROJECT_ID] [RUN_REGION]
 set -euo pipefail
@@ -30,7 +30,7 @@ ARTIFACT_DIR="${REPO_ROOT}/aksha_core/artifacts"
 # Every artifact the graph reads at runtime, with the command that rebuilds it.
 # The calibration is NOT optional: the verification gate loads its operating
 # threshold and ambiguous band from it, and with the file absent both come back
-# None and the gate raises on every incident — a 500 per message, five delivery
+# None and the gate raises on every incident -- a 500 per message, five delivery
 # attempts, then the DLQ. Shipping the graph without it is shipping a service
 # that cannot triage anything.
 REQUIRED_ARTIFACTS=(

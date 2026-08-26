@@ -3,7 +3,7 @@ uvicorn[standard]
 google-cloud-firestore
 numpy==2.4.6
 # ADK is pinned at 2.3.0 (CLAUDE.md). Re-verify every ADK-dependent code path
-# on any bump — 2.x is not one behaviour surface.
+# on any bump -- 2.x is not one behaviour surface.
 google-adk==2.3.0
 pydantic
 google-cloud-secret-manager

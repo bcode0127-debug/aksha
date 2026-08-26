@@ -7,7 +7,7 @@ is asked to adjudicate rather than to agree.
 
 The last one matters more than it looks. Asking "does the evidence support the
 hypothesis" is a question a rare-but-expected event answers YES to, because it
-genuinely is statistically deviant — so that phrasing makes the verifier
+genuinely is statistically deviant -- so that phrasing makes the verifier
 structurally incapable of rejecting anything, no matter how good the model is.
 """
 from __future__ import annotations
@@ -77,7 +77,7 @@ def test_every_category_has_exemplars(reference):
     """
     present = {w["label"] for w in reference["reference_windows"]}
     for category in CATEGORIES:
-        assert category in present, f"no {category} exemplars — verifier cannot reject"
+        assert category in present, f"no {category} exemplars -- verifier cannot reject"
 
 
 def test_categories_are_not_trivially_imbalanced(reference):
@@ -178,7 +178,7 @@ def test_verifier_instruction_is_a_one_sided_recognition_test():
 
 def test_verifier_instruction_directs_reasoning_over_the_calibrated_percentile():
     """The percentile is the decision input, and the anomaly side is absent on
-    purpose — its presence is what the previous design got wrong.
+    purpose -- its presence is what the previous design got wrong.
     """
     text = wf.EXPLAINER_INSTRUCTION.lower()
     assert "distance" in text

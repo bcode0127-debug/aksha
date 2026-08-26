@@ -2,8 +2,8 @@
 
 Pure numpy/pandas. No `google.*`, ADK or vertexai imports (ADR-002).
 
-Turns a raw Isolation Forest score — an uncalibrated number whose scale means
-nothing on its own — into a p-value with a distribution-free guarantee. This is
+Turns a raw Isolation Forest score -- an uncalibrated number whose scale means
+nothing on its own -- into a p-value with a distribution-free guarantee. This is
 inductive conformal anomaly detection: fit the model on a proper training set,
 score a disjoint calibration set drawn from the same nominal distribution, and
 rank each new score against those calibration scores.
@@ -13,7 +13,7 @@ rank each new score against those calibration scores.
     Mathematics and Artificial Intelligence, 74(1-2), 67-94.
     https://doi.org/10.1007/s10472-013-9381-7
 
-DIRECTION — read this before using `conformal_p` anywhere.
+DIRECTION -- read this before using `conformal_p` anywhere.
 
 The nonconformity score is the Isolation Forest decision score, where higher
 means more outlying. The p-value runs the other way:
@@ -29,7 +29,7 @@ exceeds something.
 
 The +1 in both places is the standard conservative correction; it keeps the
 guarantee valid for finite n and bounds p away from zero. Consequently
-p is in [1/(n+1), 1] — with 23,970 calibration windows the smallest attainable
+p is in [1/(n+1), 1] -- with 23,970 calibration windows the smallest attainable
 p-value is about 4.2e-5, and no window can ever score p = 0.
 
 THE GUARANTEE: if calibration and test nominal windows are exchangeable, then
@@ -43,7 +43,7 @@ trust it.
 
 DEFAULT_EPSILON = 0.01 is ours. It means one false alarm per hundred nominal
 windows, which over the 168,410-window test split is on the order of a thousand
-alarms — acceptable for an offline evidence panel, far too many for an operator
+alarms -- acceptable for an offline evidence panel, far too many for an operator
 console. The operating point is a routing decision, not a detector decision, so
 it is stored as a table of thresholds rather than baked in.
 """
@@ -77,7 +77,7 @@ class SplitConformalCalibrator:
         return int(self.calibration_scores.size)
 
     def p_values(self, scores: np.ndarray) -> np.ndarray:
-        """Conformal p-values. Low means anomalous — see module docstring."""
+        """Conformal p-values. Low means anomalous -- see module docstring."""
         scores = np.asarray(scores, dtype="float64")
         # count of calibration scores >= s, via the left insertion point
         at_least_as_extreme = self.n - np.searchsorted(
@@ -113,7 +113,7 @@ class SplitConformalCalibrator:
 
         The conformal bound says this should be <= epsilon on exchangeable
         nominal data. Materially above it means the exchangeability assumption
-        has broken — drift between the calibration block and the scored data —
+        has broken -- drift between the calibration block and the scored data --
         not that the arithmetic is wrong.
         """
         epsilon = self.epsilon if epsilon is None else epsilon

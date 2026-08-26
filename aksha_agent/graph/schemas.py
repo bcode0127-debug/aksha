@@ -1,7 +1,7 @@
 """Pydantic models for every node boundary in the triage graph.
 
 Each boundary is a schema, not a convention. ADK validates a node's input
-against `input_schema` before the node runs — verified in the ADK spike
+against `input_schema` before the node runs -- verified in the ADK spike
 (ADR-013): a malformed payload fails at the receiving node's gate, before any
 LLM call is made.
 
@@ -37,7 +37,7 @@ class Verdict(str, Enum):
     """What the window IS: a fault operators should act on, or expected operation.
 
     This is the GATE's output. It is produced by comparing a calibrated distance
-    against bounds loaded from the calibration artifact — no model is consulted.
+    against bounds loaded from the calibration artifact -- no model is consulted.
     The explainer LLM emits the same enum as its own independent read, but that
     value is recorded for audit and never applied.
 
@@ -72,7 +72,7 @@ class DetectionSummary(BaseModel):
     """The DetectionResult as it reaches the graph.
 
     `conformal_p` is a conformal p-value: LOW means anomalous. `threshold` is a
-    RAW SCORE threshold and is not comparable to `conformal_p` — see
+    RAW SCORE threshold and is not comparable to `conformal_p` -- see
     `aksha_agent.graph.workflow.compute_severity`.
 
     `features` is a mapping of named scalars. No raw telemetry arrays cross
@@ -159,14 +159,14 @@ class InvestigateOutput(BaseModel):
 class RecognitionEvidence(BaseModel):
     """Calibrated OUTLIERNESS: how far out on the tail this window sits.
 
-    One-sided by construction — no anomaly-exemplar field — because that
+    One-sided by construction -- no anomaly-exemplar field -- because that
     comparison measured near-chance (AUC 0.593 anomaly vs rare_event on 3,804
     vs 3,369 training windows) and dragged the explainer toward reject.
 
     Read as outlierness, NOT as resemblance. The calibration showed nominal
     windows sit closer to rare-event exemplars (median 1.05) than rare events
     sit to each other (median 4.37), so a small distance does not mean "this is
-    a known rare event" — it means "this is unremarkable". What the distance
+    a known rare event" -- it means "this is unremarkable". What the distance
     tracks is distance from anything on record, which is what correlates with a
     fault. Describing it as recognition would describe something false.
     """
@@ -219,7 +219,7 @@ class ExplainerOutput(BaseModel):
     status: Verdict = Field(
         description=(
             "Your own independent read of what this window is. It is RECORDED "
-            "FOR AUDIT and does not affect the outcome — a deterministic gate "
+            "FOR AUDIT and does not affect the outcome -- a deterministic gate "
             "sets the verdict. Answer honestly rather than strategically. "
             "'confirm' = looks like a genuine fault. 'reject' = looks like "
             "routine or expected operation. 'disputed' = the evidence does not "
@@ -253,7 +253,7 @@ class IncidentDoc(BaseModel):
     detector_version: str
 
     # The window this incident is about. Without these an alert says a channel
-    # is faulty but not when, which is not actionable — and the Slack message
+    # is faulty but not when, which is not actionable -- and the Slack message
     # rendered them as "?" until they were carried here.
     t_start: str | None = None
     t_end: str | None = None
@@ -283,7 +283,7 @@ class IncidentDoc(BaseModel):
     band_low: float | None = None
     band_high: float | None = None
     # AUDIT ONLY. The explainer's independent read and its explanation. The
-    # verdict here never affects routing, severity or delivery — it is stored so
+    # verdict here never affects routing, severity or delivery -- it is stored so
     # gate-vs-model disagreement stays measurable after the fact.
     llm_verdict: Verdict | None = None
     llm_reason: str | None = None
