@@ -1,6 +1,6 @@
 """Tests for the IForest + split conformal detector.
 
-Synthetic data throughout — these run in CI without the Mission2 download or a
+Synthetic data throughout -- these run in CI without the Mission2 download or a
 trained artifact.
 
 The properties under test are the ones whose failure would be silent: leakage
@@ -70,7 +70,7 @@ def test_feature_columns_excludes_identity(splits):
 def test_scaler_statistics_come_from_train_alone(splits):
     """The scaler's fitted mean must equal the training split's mean exactly.
 
-    If any calibration or test row had reached the fit, these would differ —
+    If any calibration or test row had reached the fit, these would differ --
     the test split is deliberately shifted by 0.4 so leakage would be visible.
     """
     train, calibration, test = splits
@@ -85,7 +85,7 @@ def test_scaler_statistics_come_from_train_alone(splits):
 
     pooled = pd.concat([train, calibration, test])[FEATURES].to_numpy().mean(axis=0)
     assert not np.allclose(detector.scaler.mean_, pooled, rtol=1e-6), (
-        "scaler mean matches the pooled mean — calibration/test leaked into the fit"
+        "scaler mean matches the pooled mean -- calibration/test leaked into the fit"
     )
 
 
@@ -218,7 +218,7 @@ def test_missing_feature_column_raises(artifact, splits):
 
 
 def test_missing_feature_column_raises_after_reload(artifact, splits, tmp_path):
-    """The enforcement must survive persistence — that is where it matters."""
+    """The enforcement must survive persistence -- that is where it matters."""
     _, _, test = splits
     reloaded = DetectorArtifact.load(artifact.save(tmp_path / "d.joblib"))
     with pytest.raises(ValueError, match="feature columns missing"):

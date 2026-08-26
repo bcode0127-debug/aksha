@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Offline evaluation of the triage graph's discrimination.
 
-Runs the real graph — both LLM nodes, the real context provider, the real
-routers — directly in-process over a stratified sample of the test split. No
+Runs the real graph -- both LLM nodes, the real context provider, the real
+routers -- directly in-process over a stratified sample of the test split. No
 Pub/Sub, no Cloud Run, no Firestore: this measures the graph's judgement, not
 the delivery path.
 
@@ -195,7 +195,7 @@ def three_way(results: list[dict]) -> str:
     agree = sum(1 for r in ok if r["gate_verdict"] == r["llm_verdict"])
     lines.append(
         f"  gate and llm agree: {agree}/{len(ok)} ({agree / max(len(ok),1):.0%})"
-        "   [audit only — disagreement changes nothing]"
+        "   [audit only -- disagreement changes nothing]"
     )
 
     by_cat = {}
@@ -244,8 +244,8 @@ def rates(results: list[dict]) -> str:
 def golden_sample(path: Path) -> pd.DataFrame:
     """Load the committed golden set as a scored frame.
 
-    Everything the graph needs is already in the file — features, detector
-    score, conformal p, threshold — so this never re-scores and never
+    Everything the graph needs is already in the file -- features, detector
+    score, conformal p, threshold -- so this never re-scores and never
     resamples. That is the point: two runs a week apart see the same windows
     with the same inputs, so a change in the numbers is a change in the design.
     """
@@ -276,7 +276,7 @@ def golden_sample(path: Path) -> pd.DataFrame:
 def golden_report(results: list[dict], sample: pd.DataFrame) -> str:
     """Score against the expected verdicts, group by group.
 
-    `ambiguous` rows are counted but never marked right or wrong — they have no
+    `ambiguous` rows are counted but never marked right or wrong -- they have no
     expected verdict on purpose. Reporting them as a hit rate would invent an
     answer the data does not have.
     """
@@ -292,7 +292,7 @@ def golden_report(results: list[dict], sample: pd.DataFrame) -> str:
         mix = dict(Counter(r["final_verdict"] for r, _ in rows))
         want = rows[0][1]
         # pandas coerces the ambiguous group's None to NaN on the way through
-        # the frame, and NaN is not None — checking identity alone would score
+        # the frame, and NaN is not None -- checking identity alone would score
         # rows that were deliberately given no expected verdict.
         if want is None or pd.isna(want):
             lines.append(f"{group:<16}{len(rows):>4}{'(none)':>10}{'-':>10}   {mix}")
@@ -327,7 +327,7 @@ async def main_async(args) -> int:
               f"({dict(Counter(sample['golden_group']))})")
     elif args.holdout:
         # STEP 6: fault sensitivity on anomaly windows absent from the reference.
-        # Train-period, so not a headline metric — but it turns n=1 into a real
+        # Train-period, so not a headline metric -- but it turns n=1 into a real
         # measurement of whether the verifier recognises faults at all.
         from aksha_core.detectors.iforest import feature_columns
 

@@ -10,7 +10,7 @@ Deterministic: the Isolation Forest is seeded, and nothing about the fit
 depends on row order. Re-running reproduces the artifact's scores exactly.
 
 Fits on the training split only, calibrates on the calibration split only, and
-reports the test split's score distribution without computing any metric — the
+reports the test split's score distribution without computing any metric -- the
 split has 4 anomaly windows from a single event (docs/mission2-adapter-notes.md),
 which is not enough to support an anomaly-class metric, and this script is not
 the place to pretend otherwise.

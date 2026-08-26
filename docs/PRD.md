@@ -1,4 +1,4 @@
-# AKSHA — PRD v0.2
+# AKSHA -- PRD v0.2
 *Aug 11, 2026. Status: locked (design phase complete).*
 
 **1. Problem**
@@ -29,7 +29,7 @@ Out: cascade prediction, OpenTelemetry, digital twin, ESA-ADB as build data, phy
 Stage One (pass/fail): Gemini 3.5 via Vertex AI, ADK, GCP services, GCP deployment proof in video, repo, architecture diagram, README spin-up, ~4-min video.
 Stage Two: autonomous multi-step completion with no human intervention (40%); decoupling, state management, scoped tools, failure handling (30%); unedited live execution with visible logs and database writes (30%).
 Product: end-to-end run on ESA-ADB Mission2 with at least one gate rejection and one correct escalation, measured against ground-truth labels.
-Evaluation integrity: report the 7 benchmark-style metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on ESA-ADB Mission2's own train/calibration/test split (137,235/23,970/168,410 windows), positive class `rare_event ∪ anomaly` — Mission2's test split carries only 4 true anomaly-labelled windows from a single event, too few to support an anomaly-only metric on its own (ADR-015; docs/mission2-adapter-notes.md). Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
+Evaluation integrity: report the 7 benchmark-style metrics (Accuracy, Precision, Recall, F1, MCC, AUC_ROC, AUC_PR) on ESA-ADB Mission2's own train/calibration/test split (137,235/23,970/168,410 windows), positive class `rare_event ∪ anomaly` -- Mission2's test split carries only 4 true anomaly-labelled windows from a single event, too few to support an anomaly-only metric on its own (ADR-015; docs/mission2-adapter-notes.md). Point-adjusted F1 is never reported (Kim et al., AAAI 2022; PA originates with Xu et al., WWW 2018).
 
 **6. Constraints**
 

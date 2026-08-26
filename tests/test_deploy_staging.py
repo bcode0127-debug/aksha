@@ -3,7 +3,7 @@
 This exists because it did not. The verification gate loads its operating
 threshold and ambiguous band from `mission2_recognition_calibration.json`, and
 `scripts/deploy_triage.sh` staged only the context reference. On Cloud Run both
-values would have come back None and the gate raises — a 500 per message, five
+values would have come back None and the gate raises -- a 500 per message, five
 delivery attempts, then the dead-letter queue. The local test suite could not
 see it, because locally the file is simply there.
 

@@ -8,7 +8,7 @@ venv/
 .ruff_cache/
 
 # --- Secrets ---
-# Never a blanket *.json — config JSON stays tracked.
+# Never a blanket *.json -- config JSON stays tracked.
 .env
 .streamlit/secrets.toml
 *-service-account*.json

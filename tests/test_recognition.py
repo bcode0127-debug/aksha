@@ -161,7 +161,7 @@ def test_calibration_grid_is_monotonic_and_complete(calibration):
 
 
 def test_percentile_placement_is_ordered(provider):
-    """A larger distance must never map to a smaller percentile — the number the
+    """A larger distance must never map to a smaller percentile -- the number the
     verifier reasons over has to mean what the prompt says it means.
     """
     values = [provider._percentile_of(d) for d in (0.1, 1.0, 5.0, 20.0, 500.0, 1e9)]

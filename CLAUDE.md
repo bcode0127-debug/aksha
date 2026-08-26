@@ -1,8 +1,8 @@
-# AKSHA — build rules
+# AKSHA -- build rules
 
 ## Core/agent isolation
 
-`aksha_core` imports **zero** of `google`, `adk`, `vertexai`. This is a hard boundary — the
+`aksha_core` imports **zero** of `google`, `adk`, `vertexai`. This is a hard boundary -- the
 detection/conformal core must be runnable and testable with no Google/ADK/Vertex dependency in
 the import graph. CI enforces this with a grep over `aksha_core/` for those import roots; a
 violation fails the build. If Google-specific glue is genuinely needed, it belongs in
@@ -24,16 +24,16 @@ the change, not the ticket.
 ## Dependencies
 
 - `google-adk` is pinned at `2.3.0`. Re-verify all ADK-dependent code paths any time this pin is
-  bumped — minor versions have changed agent/tool call signatures before.
+  bumped -- minor versions have changed agent/tool call signatures before.
 - `ADK_MODEL` must be Gemini 3.5 or newer. The ADK tutorial defaults (older Gemini models) fail
-  Stage One of the pipeline — do not use them, even for local smoke tests.
+  Stage One of the pipeline -- do not use them, even for local smoke tests.
 - Use `GOOGLE_GENAI_USE_ENTERPRISE=True` to route through Vertex/Enterprise. `GOOGLE_GENAI_USE_VERTEXAI`
-  is deprecated in `google-adk` 2.3.0 — tutorials and older docs still use it, do not copy that
+  is deprecated in `google-adk` 2.3.0 -- tutorials and older docs still use it, do not copy that
   name in. Re-verify on any version bump.
 
 ## Naming
 
-Node names in `aksha_agent/graph` are a routing contract, not cosmetic labels — other code and
+Node names in `aksha_agent/graph` are a routing contract, not cosmetic labels -- other code and
 docs reference them by exact string. If you rename a node, grep all of `docs/` and the rest of
 the repo for the old name and update every reference in the same commit.
 
@@ -49,4 +49,5 @@ the repo for the old name and update every reference in the same commit.
 
 ## Writing style
 
-- Use em dashes (—) in prose — docs, commit messages, PR descriptions. User directive.
+- No em dashes anywhere -- docs, commit messages, PR descriptions, code comments. Use "--",
+  a comma, a colon, or a period instead. User directive.

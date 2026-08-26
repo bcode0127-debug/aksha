@@ -6,7 +6,7 @@ a file in this repository: a Slack incoming webhook is a bearer credential, and
 anyone holding one can post to that channel.
 
 Delivery is best-effort by design (TRD section 9). A Slack outage must not lose
-an incident that the graph has already reasoned about — the incident is recorded
+an incident that the graph has already reasoned about -- the incident is recorded
 either way and the attempt is reported as `delivered` or `failed`, so a silent
 non-delivery is impossible to mistake for a successful one.
 """
@@ -48,7 +48,7 @@ def _fmt_p(value) -> str:
 
 
 def render(incident: dict) -> dict:
-    """Build the Slack payload. Readable at a glance — this is the demo shot.
+    """Build the Slack payload. Readable at a glance -- this is the demo shot.
 
     Kept deliberately plain: severity and verdict first, then the reasoning, then
     the numbers. Someone watching a recording should be able to tell what
@@ -62,13 +62,13 @@ def render(incident: dict) -> dict:
     reason = str(incident.get("llm_reason") or "").strip() or "_no reason recorded_"
     llm_verdict = incident.get("llm_verdict")
 
-    headline = f"{emoji} {severity} — {incident.get('channel_id', 'unknown channel')}"
+    headline = f"{emoji} {severity} -- {incident.get('channel_id', 'unknown channel')}"
     flags = []
     if incident.get("routing_anomaly"):
         flags.append("⚠️ routing anomaly (unrecognised route, defaulted to log)")
     if verdict == "disputed":
         flags.append(
-            "⚖️ disputed — the calibrated distance fell inside the uncertainty "
+            "⚖️ disputed -- the calibrated distance fell inside the uncertainty "
             "band; not escalated"
         )
     if llm_verdict and llm_verdict != verdict:
@@ -95,7 +95,7 @@ def render(incident: dict) -> dict:
     body = "\n".join(lines)
 
     return {
-        "text": f"{headline} — verdict {verdict} — routed to {destination}",
+        "text": f"{headline} -- verdict {verdict} -- routed to {destination}",
         "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": body}}],
     }
 

@@ -1,4 +1,4 @@
-"""Detector service — fast path.
+"""Detector service -- fast path.
 
 Receives a Pub/Sub push envelope on `telemetry-in`, scores the window with the
 committed Isolation Forest + split conformal artifact, writes the
@@ -8,7 +8,7 @@ DetectionResult to Firestore, and republishes it to `triage`. See TRD sections
 The artifact is loaded once at cold start, not per request: it is ~1.8 MB and
 unpickling it on every push would dominate the fast path's latency budget.
 
-`conformal_p` is a conformal p-value — LOW means anomalous. See
+`conformal_p` is a conformal p-value -- LOW means anomalous. See
 `aksha_core.conformal.split` for the direction and the guarantee. Anything
 downstream that reads this field must not treat it as an anomaly confidence.
 """
@@ -84,7 +84,7 @@ async def handle_push(request: Request) -> Response:
     # Idempotency gates on published == true, not document existence. A write
     # can succeed while the publish that follows it fails (crash, quota,
     # permission error); gating on existence would make that failure
-    # unrecoverable — redelivery would find the doc, skip, and 204 without
+    # unrecoverable -- redelivery would find the doc, skip, and 204 without
     # ever republishing. Gating on the flag lets redelivery retry the publish.
     if snapshot.exists and snapshot.to_dict().get("published"):
         logger.info("detection %s already published, skipping", idempotency_key)

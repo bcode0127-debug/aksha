@@ -3,7 +3,7 @@
 
 ADR-013's consequence: the architecture diagram is generated from the running
 object, so the diagram is provably the system rather than a drawing that
-drifted away from it. Nothing here is hand-maintained — rename a node and this
+drifted away from it. Nothing here is hand-maintained -- rename a node and this
 output changes with it.
 
     python3 scripts/dump_graph.py              # readable summary
@@ -122,7 +122,7 @@ def render_text(nodes: dict, edges: list) -> str:
     for edge in defaults:
         lines.append(f"  {edge['from']} -> {edge['to']}")
     if not defaults:
-        lines.append("  NONE — an unmatched route would end its branch silently (ADR-013)")
+        lines.append("  NONE -- an unmatched route would end its branch silently (ADR-013)")
     return "\n".join(lines)
 
 

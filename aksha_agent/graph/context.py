@@ -7,14 +7,14 @@ context.
 
 Retrieval is PER CATEGORY, not k-nearest overall. The explainer is asked to
 decide whether a window is a genuine fault or unusual-but-expected operation,
-and it cannot do that from neighbours that all happen to be nominal — which is
+and it cannot do that from neighbours that all happen to be nominal -- which is
 what an overall k-nearest search returns, since nominal windows outnumber the
 rest by roughly forty to one. Returning the nearest known nominal, the nearest
 known rare_event and the nearest known anomaly, each with its distance, gives
 the question something to be answered against.
 
 Everything produced is a summary of named scalars. No raw telemetry array
-reaches an LLM (ADR-003) — an exemplar is a feature summary of a comparable
+reaches an LLM (ADR-003) -- an exemplar is a feature summary of a comparable
 window, never its series.
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ DEFAULT_REFERENCE = _ARTIFACTS / "mission2_context_reference.json"
 DEFAULT_CALIBRATION = _ARTIFACTS / "mission2_recognition_calibration.json"
 
 # Ours: how much context the models get. Enough to compare against, small
-# enough that the prompt stays cheap — the spike showed thinking tokens already
+# enough that the prompt stays cheap -- the spike showed thinking tokens already
 # dominate the bill, so padding the prompt buys nothing.
 TOP_DEVIANT_FEATURES = 6
 PER_CATEGORY = 1
@@ -146,7 +146,7 @@ class ReferenceContextProvider:
         evidence: how far this window is from
         the nearest KNOWN expected pattern, calibrated.
 
-        Deliberately one-sided — no anomaly exemplar is computed here, so none
+        Deliberately one-sided -- no anomaly exemplar is computed here, so none
         can reach the explainer even by accident.
         """
         matched = None
@@ -219,7 +219,7 @@ class ReferenceContextProvider:
         chosen = [stat for _, stat in scored[:TOP_DEVIANT_FEATURES]]
 
         # Guarantee the decision-relevant features are present even when they
-        # are not among the most deviant — see ALWAYS_REPORTED.
+        # are not among the most deviant -- see ALWAYS_REPORTED.
         already = {stat.feature for stat in chosen}
         by_name = {stat.feature: stat for _, stat in scored}
         for feature in ALWAYS_REPORTED:

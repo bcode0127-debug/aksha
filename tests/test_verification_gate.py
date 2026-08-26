@@ -1,6 +1,6 @@
 """Tests for the deterministic verification gate.
 
-The property under test is that the LLM cannot change the outcome AT ALL — not
+The property under test is that the LLM cannot change the outcome AT ALL -- not
 that its influence is bounded, but that it has none. That is provable rather
 than samplable because `gate_verdict()` takes no LLM argument: there is no
 parameter through which an opinion could enter.
@@ -112,7 +112,7 @@ def test_disputed_arises_only_inside_the_band(llm):
     """Outside the band the verdict is never `disputed`, whatever the model says.
 
     This is what changed: `disputed` used to mean "the model disagreed", which
-    made it a report on model behaviour. It now means one thing — the calibrated
+    made it a report on model behaviour. It now means one thing -- the calibrated
     distance did not decide.
     """
     for distance in (0.0, 0.5, 1.0, 3.0, 4.0, 40.0):

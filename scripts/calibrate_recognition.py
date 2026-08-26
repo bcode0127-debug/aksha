@@ -55,7 +55,7 @@ PERCENTILES = (1, 5, 10, 25, 50, 75, 90, 95, 99)
 # fraction of it. The gate returns `disputed` inside this band instead of
 # forcing a call it cannot support: the distance separates the categories, but
 # not cleanly (AUC 0.788 fault-vs-expected), so there is a zone where the number
-# genuinely does not decide. 0.35 is a choice, not a fitted value — it is set
+# genuinely does not decide. 0.35 is a choice, not a fitted value -- it is set
 # here so that recalibrating moves the band with the threshold, and so that the
 # cost of widening it is measured below rather than assumed.
 AMBIGUOUS_BAND_FRACTION = 0.35
@@ -225,7 +225,7 @@ def main() -> int:
     print(f"  balanced accuracy       {best[0]:.3f}")
 
     # What the band costs. A three-way rule cannot be scored by recall and
-    # specificity alone, because `disputed` is neither right nor wrong — so
+    # specificity alone, because `disputed` is neither right nor wrong -- so
     # report what lands in the band, by true category, and let the reader see
     # how much decision it absorbs.
     low = threshold * (1.0 - AMBIGUOUS_BAND_FRACTION)
@@ -273,7 +273,7 @@ def main() -> int:
         "rare_event_percentile_grid": grid,
         "rare_event_percentile_values": rare_curve,
         # OURS. The deterministic gate's operating point. Loaded by the graph,
-        # never hardcoded there — changing the calibration must change the gate.
+        # never hardcoded there -- changing the calibration must change the gate.
         "operating_threshold": {
             "distance": round(threshold, 4),
             "rule": "distance >= threshold  =>  fault",

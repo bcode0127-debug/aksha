@@ -51,7 +51,7 @@ _context.operating_threshold = 2.0
 def _make_recognition(distance: float):
     """Stub recognition evidence at a chosen distance.
 
-    Tests drive the GATE through this, because the gate — not the LLM — decides
+    Tests drive the GATE through this, because the gate -- not the LLM -- decides
     the verdict. A test that only set the model's opinion would be asserting
     against a component with no say in the outcome at all.
     """
@@ -206,7 +206,7 @@ def test_an_unrecognised_model_status_is_recorded_and_changes_nothing():
     An off-enum status from the model was previously a routing hazard, because
     the model's status WAS the routed value. It no longer is: the gate routes on
     its own verdict, so a garbage model status cannot reach the router at all.
-    What remains is an audit obligation — it must still be visible that the
+    What remains is an audit obligation -- it must still be visible that the
     model returned something unusable, rather than vanishing silently.
     """
     incident, trace = run_graph(verifier_status="banana", gate_distance=0.5)
@@ -270,7 +270,7 @@ def test_graph_declares_a_default_route_on_every_dict_edge():
     default_sources = {
         e.from_node.name for e in graph.graph.edges if e.route == DEFAULT_ROUTE
     }
-    assert routed_sources, "no dict edges found — graph shape changed"
+    assert routed_sources, "no dict edges found -- graph shape changed"
     assert routed_sources == default_sources, (
         f"routers without a DEFAULT_ROUTE: {routed_sources - default_sources}"
     )

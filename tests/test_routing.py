@@ -50,7 +50,7 @@ def test_advisory_routes_to_the_log():
 
 
 def test_disputed_never_escalates_even_at_the_most_extreme_p():
-    """A disagreement is logged, not escalated — however anomalous the window
+    """A disagreement is logged, not escalated -- however anomalous the window
     looks. Escalating on disagreement would page an operator on the strength of
     two models failing to agree.
     """
@@ -120,7 +120,7 @@ def test_webhook_failure_marks_failed_without_losing_the_incident():
 
 def test_a_raising_notifier_would_not_be_swallowed_silently():
     """SlackNotifier.post is contracted never to raise. If a future
-    implementation breaks that contract, the incident is lost — so the contract
+    implementation breaks that contract, the incident is lost -- so the contract
     is asserted directly on the real class.
     """
     notifier = slack.SlackNotifier(project_id="p", client=object())

@@ -1,7 +1,7 @@
 # OPSSAT-AD data notes
 
 Facts recorded from the pinned Zenodo record and the fetched files, via
-`scripts/fetch_data.py`. No design decisions here — see ADRs for those.
+`scripts/fetch_data.py`. No design decisions here -- see ADRs for those.
 
 ## Pinned record
 
@@ -54,7 +54,7 @@ Both verified against these checksums by `scripts/fetch_data.py` at fetch time.
   | 21 | `var_div_duration` | float64 |
   | 22 | `var_div_len` | float64 |
 
-- Non-feature columns: `segment` (row id), `anomaly` (label), `train` (split), `channel` (channel id) — 4 columns.
+- Non-feature columns: `segment` (row id), `anomaly` (label), `train` (split), `channel` (channel id) -- 4 columns.
 - **Feature columns: 19** (not 18), in file order:
   `sampling`, `duration`, `len`, `mean`, `var`, `std`, `kurtosis`, `skew`, `n_peaks`, `smooth10_n_peaks`, `smooth20_n_peaks`, `diff_peaks`, `diff2_peaks`, `diff_var`, `diff2_var`, `gaps_squared`, `len_weighted`, `var_div_duration`, `var_div_len`
 
@@ -66,7 +66,7 @@ Both verified against these checksums by `scripts/fetch_data.py` at fetch time.
 | 1 (train) | 1594 |
 
 Total: 2123. Test count (529) matches the PRD/TRD's stated 529; train count
-(1594) does not match the stated 1494 — off by 100.
+(1594) does not match the stated 1494 -- off by 100.
 
 ### Label column: `anomaly`
 
@@ -112,7 +112,7 @@ All 23 columns: 0 nulls.
 ### Join key to `dataset.csv`
 
 `segment` (int64, present in both files). `set(dataset.csv.segment) ==
-set(segments.csv.segment)` is `True` — both files cover the same 2123
+set(segments.csv.segment)` is `True` -- both files cover the same 2123
 segment IDs (1–2123). Rows per segment in `segments.csv` range from 8 to
 1040 (mean ~143).
 

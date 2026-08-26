@@ -5,7 +5,7 @@ Two things, both restricted to the TRAIN PERIOD (window_start < 2001-07-01):
 
   * per-channel NOMINAL mean/std for every feature, so a window can be placed
     against its own channel's normal envelope as z-scores;
-  * labeled exemplars of every category — nominal, rare_event, anomaly — so the
+  * labeled exemplars of every category -- nominal, rare_event, anomaly -- so the
     verifier has a reference for each class it is asked to discriminate between.
 
 WHY THE EXEMPLARS INCLUDE WINDOWS THE ADAPTER PURGED
@@ -15,7 +15,7 @@ split, and that is correct: an unsupervised detector fitted on examples of the
 thing it is meant to find is not fitted on nominal behaviour any more. But the
 purge governs *what the model is fitted on*. Retrieval material is a different
 question, and conflating the two left the verifier with a reference set that was
-100% nominal — it had never seen an example of the class it was supposed to
+100% nominal -- it had never seen an example of the class it was supposed to
 reject, so it could not discriminate. This script therefore reads the UNPURGED
 feature table and keeps the labels.
 
@@ -24,7 +24,7 @@ WHAT IS STILL FORBIDDEN
 Nothing at or after 2001-07-01 may enter the reference. That is the train cut
 (ESA-ADB's `validation_splits["21_months"]`), and both the calibration block and
 the test split lie beyond it. Retrieving a neighbour from either would put
-evaluation rows into the reasoning context of a run being evaluated on them —
+evaluation rows into the reasoning context of a run being evaluated on them --
 leakage through the back door, even though nothing is fitted on them. The
 constraint is asserted in code below, not merely intended.
 
@@ -53,7 +53,7 @@ DEFAULT_HOLDOUT = "data/processed/mission2_anomaly_holdout.parquet"
 
 # STEP 6: anomaly windows reserved OUT of the reference so fault sensitivity
 # can be measured on windows the verifier has never been shown. Without a
-# holdout the measurement is circular — the exemplar it matches against
+# holdout the measurement is circular -- the exemplar it matches against
 # could be the window itself.
 HOLDOUT_ANOMALIES = 200
 

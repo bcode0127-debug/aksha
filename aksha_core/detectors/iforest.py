@@ -7,7 +7,7 @@ The detector is fitted on the training split only. That split is purged of
 every anomaly- and rare-event-labelled window by the adapter, so it is nominal
 by construction.
 
-CONTAMINATION — ours, and it does less than it looks like it does.
+CONTAMINATION -- ours, and it does less than it looks like it does.
 
 PyOD requires a `contamination` value, documented as the expected proportion of
 outliers in the training data. That assumption does not apply here: the
@@ -21,11 +21,11 @@ unchanged. Since the conformal p-value depends only on a score's rank against
 the calibration scores, contamination cannot move it.
 
 So CONTAMINATION is set to 0.01 rather than PyOD's 0.1 default purely so that
-`threshold_`/`labels_` — which this codebase never reads — do not imply that a
+`threshold_`/`labels_` -- which this codebase never reads -- do not imply that a
 tenth of the nominal training data is anomalous. The operating threshold comes
 from split conformal calibration (`aksha_core.conformal.split`), not from PyOD.
 
-OTHER CHOICES — ours:
+OTHER CHOICES -- ours:
 
   * One global model across all 11 channels, with `channel` excluded from the
     feature matrix. The model therefore learns the union of nominal behaviour
@@ -40,7 +40,7 @@ OTHER CHOICES — ours:
     ours for this feature table, not inherited from a published protocol.
 
   * Missing `seconds_since_last_tc` (11 training rows, windows preceding the
-    first telecommand on record) is imputed with the maximum seen in training —
+    first telecommand on record) is imputed with the maximum seen in training --
     a finite stand-in for "longer ago than anything observed". The imputation
     value is fitted on train and stored in the artifact, so calibration and
     test never influence it.
@@ -100,7 +100,7 @@ class FittedDetector:
         return ordered.to_numpy(dtype="float64")
 
     def raw_scores(self, frame: pd.DataFrame) -> np.ndarray:
-        """Isolation Forest decision scores. Higher means more outlying — this
+        """Isolation Forest decision scores. Higher means more outlying -- this
         is PyOD's direction, verified in-session, and it is used directly as the
         nonconformity score by the conformal layer.
         """
