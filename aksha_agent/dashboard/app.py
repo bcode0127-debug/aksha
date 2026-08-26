@@ -309,12 +309,17 @@ def render_incident_strip(incidents: list[dict], selected_id: str | None) -> Non
     for incident in incidents:
         cols = st.columns([1.8, 1.0, 1.0, 1.0, 1.3, 0.7])
         is_selected = incident["_id"] == selected_id
+        # Pre-gate incidents (no gate_verdict at all -- test fragments from
+        # before PR #14's deterministic gate) carry no decision to show, so
+        # they're dimmed rather than left visually identical to a real one.
+        has_gate_data = incident.get("gate_verdict") is not None
+        row_style = "" if has_gate_data else "opacity:0.45;"
         prefix = "▶ " if is_selected else ""
-        cols[0].markdown(f"{prefix}{incident.get('timestamp_utc', '-')}")
-        cols[1].markdown(str(incident.get("channel_id", "-")))
+        cols[0].markdown(f'<span style="{row_style}">{prefix}{incident.get("timestamp_utc", "-")}</span>', unsafe_allow_html=True)
+        cols[1].markdown(f'<span style="{row_style}">{incident.get("channel_id", "-")}</span>', unsafe_allow_html=True)
         cols[2].markdown(badge_html(incident.get("severity"), SEVERITY_STYLE), unsafe_allow_html=True)
         cols[3].markdown(badge_html(incident.get("final_verdict"), VERDICT_STYLE), unsafe_allow_html=True)
-        cols[4].markdown(str(incident.get("routing_destination", "-")))
+        cols[4].markdown(f'<span style="{row_style}">{incident.get("routing_destination", "-")}</span>', unsafe_allow_html=True)
         if cols[5].button("Load", key=f"select_{incident['_id']}", disabled=is_selected):
             st.session_state["selected_incident"] = incident["_id"]
             st.rerun()
@@ -331,19 +336,25 @@ def render_evidence_strip() -> None:
     )
 
 
-def main() -> None:
-    st.set_page_config(page_title="AKSHA telemetry triage console", layout="wide", initial_sidebar_state="collapsed")
-    inject_css()
-    plt.rcParams.update({"text.color": FG, "axes.edgecolor": GRID, "axes.labelcolor": MUTED})
-
-    st.title("AKSHA: telemetry triage console")
-    st.caption(f"Firestore project: `{PROJECT_ID}` · read-only · refreshes every 30s")
-
+@st.fragment(run_every=30)
+def render_body() -> None:
+    """Everything that needs to see new Firestore writes without a manual
+    reload. Wrapped in a fragment with run_every=30 so the 30s refresh in the
+    caption is an actual mechanism, not just a claim: Streamlit reruns this
+    function on that timer on its own, independent of user interaction --
+    @st.cache_data(ttl=30) above only expires a cached value, it does not by
+    itself cause anything to re-run and re-fetch it.
+    """
     incidents = load_incidents(INCIDENT_LIMIT)
     selected_id = st.session_state.get("selected_incident")
     selected = next((i for i in incidents if i["_id"] == selected_id), None)
     if selected is None and incidents:
-        selected = incidents[0]
+        # Default to the newest incident that actually has gate data, not
+        # simply the newest overall -- incidents/ carries a long tail of
+        # pre-gate test fragments (predating PR #14's deterministic gate)
+        # with no gate_verdict at all, and opening the Decision pane on one
+        # of those means it opens empty every time.
+        selected = next((i for i in incidents if i.get("gate_verdict") is not None), incidents[0])
         st.session_state["selected_incident"] = selected["_id"]
 
     top_left, top_right = st.columns([65, 35])
@@ -359,6 +370,17 @@ def main() -> None:
     st.divider()
     render_incident_strip(incidents, selected["_id"] if selected else None)
     render_evidence_strip()
+
+
+def main() -> None:
+    st.set_page_config(page_title="AKSHA telemetry triage console", layout="wide", initial_sidebar_state="collapsed")
+    inject_css()
+    plt.rcParams.update({"text.color": FG, "axes.edgecolor": GRID, "axes.labelcolor": MUTED})
+
+    st.title("AKSHA: telemetry triage console")
+    st.caption(f"Firestore project: `{PROJECT_ID}` · read-only · refreshes every 30s")
+
+    render_body()
 
 
 if __name__ == "__main__":
