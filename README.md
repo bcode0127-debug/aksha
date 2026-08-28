@@ -116,7 +116,8 @@ channel's raw signal, a calibrated threshold-overlay decision panel, the full
 agent trace, and a clickable incident strip.
 
 Public, no credentials needed: **https://dashboard-895195973069.us-central1.run.app**
-(Cloud Run, `min-instances=0`, `aksha-dashboard-reader` service account --
+(Cloud Run revision `dashboard-00003-5x5`, built from commit `314cb9b`,
+`min-instances=0`, `aksha-dashboard-reader` service account --
 `roles/datastore.viewer` only, no write path anywhere in the dashboard's
 code). Redeploy after new incidents land, so the shipped signal cache stays
 current:
