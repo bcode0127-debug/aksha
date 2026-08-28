@@ -16,7 +16,7 @@ Three recipient tiers, each with a different threshold for interruption:
 
 **3. What AKSHA does**
 
-Automates the 7-step operator triage loop: open the trend, pull correlated context, check history, decide real vs false alarm, assign severity, file, escalate or log. Event-driven, runs in the background on a telemetry stream, no human driving steps.
+Automates the operator triage loop: open the trend, pull correlated context, check history, decide real vs false alarm, assign severity, file, escalate or log. Event-driven, runs in the background on a telemetry stream, no human driving steps.
 
 **4. Scope**
 

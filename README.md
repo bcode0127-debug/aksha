@@ -2,12 +2,12 @@
 
 ## What it is
 
-Spacecraft telemetry monitoring today is mostly fixed-threshold out-of-limit
-alarms: context-blind, and at real telemetry volume even a small false-alarm
-rate floods the control room until operators start ignoring alerts. A
-detector emitting a score doesn't say which channel drifted, whether the
-pattern matches a known failure mode, or who should be woken up -- closing
-that gap is a manual, 7-step operator triage loop today. AKSHA automates it:
+Spacecraft telemetry monitoring is dominated by out-of-limit threshold
+alarms, which are simple to interpret but depend heavily on expert-set limits
+and produce high false alarm rates in noisy telemetry (Fejjari et al. 2025).
+A detector emitting a score does not say which channel drifted, whether the
+pattern matches a known failure mode, or who should be woken up, and closing
+that gap is a manual triage loop today. AKSHA automates it:
 an Isolation Forest detector with split-conformal calibration flags anomalies
 in real time, a deterministic gate -- calibrated on distance to known
 rare-event exemplars, not an LLM's judgment -- decides real-vs-false-alarm,
@@ -178,5 +178,10 @@ subset (channels 18–28) -- see [ADR-015](docs/adr/ADR-015.md):
 as build data -- see [ADR-006](docs/adr/ADR-006.md) (superseded by ADR-015):
 
 > Ruszczak, B., Kotowski, K., Evans, D., Nalepa, J. et al. (2025). *The OPS-SAT benchmark for detecting anomalies in satellite telemetry*. Scientific Data. Dataset: Zenodo, DOI: [10.5281/zenodo.15108715](https://doi.org/10.5281/zenodo.15108715).
+
+**Fejjari et al.** is cited for the operator-requirements framing in this
+README's "What it is" section, not as build data:
+
+> Fejjari, A., Delavault, A., Camilleri, R., Valentino, G. (2025). *A Review of Anomaly Detection in Spacecraft Telemetry Data*. Applied Sciences, 15(10), 5653. DOI: [10.3390/app15105653](https://doi.org/10.3390/app15105653).
 
 **License**: Apache License 2.0. See [LICENSE](LICENSE).
