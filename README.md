@@ -32,6 +32,13 @@ gate** (`verification_gate`) decides `confirm` / `disputed` / `reject` from
 calibrated distance alone; the LLM's read is recorded for audit but never
 touches the routing outcome.
 
+The detection and calibration logic lives in `aksha_core`, which has no
+cloud, vendor, or agent-framework imports. `aksha_agent` is the adapter layer
+that binds it to ADK, Gemini, Pub/Sub, Cloud Run, and Firestore, and the
+dependency only points inward (ADR-002). The diagram above is a runtime
+view, so `aksha_core` has no box of its own; it is linked into the detector
+service at import time.
+
 Design docs: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [ADRs](docs/adr/).
 
 ## Google technologies used
