@@ -1,9 +1,10 @@
-# AKSHA -- PRD v0.2
+# AKSHA -- PRD v0.3
 *Aug 11, 2026. Status: locked (design phase complete).*
+*Aug 28, 2026: sections 1 and 3 amended for citation accuracy, no design change.*
 
 **1. Problem**
 
-Satellite telemetry triage is still largely manual. Mission control systems perform limit checking, expected-status checks, and derived-parameter computation, with complex spacecraft carrying 6000+ monitored parameters (ESA Bulletin 89). Detection in practice is mostly fixed-threshold out-of-limit alarms, which are context-blind, and at telemetry volume even a small false-alarm rate floods the control room until operators ignore alerts (ML-for-reliability review, arXiv 2008.08221).
+Satellite telemetry triage is still largely manual. Mission control systems perform limit checking, expected-status checks, and derived-parameter computation (Baldi et al., ESA Bulletin 89, 1997). Detection in practice is still dominated by fixed-threshold out-of-limit alarms, which are context-blind and, in noisy telemetry, produce high false alarm rates (Fejjari et al. 2025).
 
 A detector emits a score, not a decision. It doesn't say which channel drifted, whether the pattern matches a known failure mode, whether it's real or noise, or who should be woken up. The gap between anomaly score and actionable incident is closed by a human today, and under distribution shift the score is least trustworthy exactly when it matters most.
 
@@ -16,7 +17,7 @@ Three recipient tiers, each with a different threshold for interruption:
 
 **3. What AKSHA does**
 
-Automates the operator triage loop: open the trend, pull correlated context, check history, decide real vs false alarm, assign severity, file, escalate or log. Event-driven, runs in the background on a telemetry stream, no human driving steps.
+Automates the operator triage loop, which in practice involves opening the trend, pulling correlated context, checking history, deciding real versus false alarm, assigning severity, filing, and escalating or logging. This sequence is our own description of operator practice and is not drawn from a published source. Event-driven, runs in the background on a telemetry stream, no human driving steps.
 
 **4. Scope**
 
@@ -46,3 +47,9 @@ No first-of-kind claims. Agentic anomaly triage exists in NASA ground infrastruc
 **9. Name**
 
 AKSHA (Sanskrit अक्ष): axis, eye, indestructible. One spelling everywhere.
+
+**10. Citations**
+
+> Fejjari, A., Delavault, A., Camilleri, R., Valentino, G. (2025). *A Review of Anomaly Detection in Spacecraft Telemetry Data*. Applied Sciences, 15(10), 5653. DOI: [10.3390/app15105653](https://doi.org/10.3390/app15105653).
+
+> Baldi, A., Jones, M., Kaufeler, J.F., Maigné, P. (1997). *The Evolution of ESA's Spacecraft Control Systems*. ESA Bulletin 89.
