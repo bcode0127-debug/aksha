@@ -287,6 +287,12 @@ def render_funnel_strip() -> None:
                 )
                 st.caption(source)
 
+    st.caption(
+        "Each stage is a subset of the one before it. The detector scores "
+        "every window and publishes only those above the calibrated "
+        "conformal threshold."
+    )
+
 
 # --- Pane 1: Signal ---------------------------------------------------------
 
@@ -555,6 +561,12 @@ def render_incident_strip(incidents: list[dict], selected_id: str | None) -> Non
         if cols[5].button("Load", key=f"select_{incident['_id']}", disabled=is_selected):
             st.session_state["selected_incident"] = incident["_id"]
             st.rerun()
+
+    st.caption(
+        "Replay publishes the Mission2 test split in chronological order. "
+        "Only windows the live detector scores above the conformal threshold "
+        "become incidents."
+    )
 
 
 # --- Evidence (kept, compact, below the fold) --------------------------------
