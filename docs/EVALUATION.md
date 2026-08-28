@@ -181,6 +181,29 @@ Two Gemini calls per incident (`gemini-3.5-flash` investigate,
 `gemini-3.5-flash-lite` explain), 6,834–6,981 tokens regardless of path, across
 223 real incidents scored this session (22 golden + 200 holdout + 1 live).
 
+## 7. Recall consequence of ADR-016
+
+ADR-016 gates the publish from detector-service to triage-service on the
+detector's conformal threshold (score >= threshold, equivalently conformal_p
+<= 0.01). Re-checking the 200-window holdout behind section 3's gate-vs-LLM
+measurement against that same threshold surfaces a consequence that
+measurement alone did not show: 86 of the 200 holdout windows (all labeled
+positives, `true_label: anomaly`) are cases where the verification gate
+confirmed and the LLM rejected, and the gate was the one that was right.
+Every one of those 86 has a conformal_p between 0.336 and 1.0
+(`eval/outputs/holdout_results.json`; median 0.75). None of them would
+survive the detector's conformal threshold.
+
+The conformal threshold, not the verification gate, is the recall bottleneck
+on this class of anomaly. Before ADR-016, the pipeline sent every scored
+window to the graph regardless of the detector's score, so this bottleneck
+was masked -- the gate still got the chance to confirm these 86 windows,
+because nothing upstream of it filtered them out first. After ADR-016, they
+never reach the graph at all.
+
+This is not mitigated here. No change to the conformal threshold, the
+detector, or the gate is proposed in this document.
+
 ## Sources
 
 | Claim | Script | Artifact / revision |
@@ -191,6 +214,7 @@ Two Gemini calls per incident (`gemini-3.5-flash` investigate,
 | Golden set | `scripts/eval_triage.py --golden` | `tests/fixtures/golden_set.json` |
 | Live confirmation | `scripts/publish_stub.py` + Firestore + Cloud Run logs | `triage-service-00006-gnw` |
 | Cost | aggregated from the three runs above | -- |
+| Recall consequence of ADR-016 | re-checked `eval/outputs/holdout_results.json` against the conformal threshold | `mission2_iforest.joblib`, ADR-016 |
 
 Full per-window results and the machine-readable version of every table above:
 `eval/outputs/golden_results.json`, `eval/outputs/holdout_results.json`,
