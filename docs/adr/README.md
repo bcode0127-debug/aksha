@@ -17,3 +17,4 @@
 | [ADR-013](ADR-013.md) | Orchestration is an ADK 2 graph workflow (Pillar 1) | Accepted |
 | [ADR-014](ADR-014.md) | Retry policy | Accepted |
 | [ADR-015](ADR-015.md) | ESA-ADB Mission2 supersedes OPSSAT-AD as the build dataset | Accepted |
+| [ADR-016](ADR-016.md) | Detector service gates the triage publish on the conformal threshold | Accepted |

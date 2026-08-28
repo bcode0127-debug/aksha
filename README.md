@@ -22,8 +22,10 @@ stream, no human in the loop for routine cases.
 Detailed graph, generated from the live `Workflow.graph.edges`: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 Two Cloud Run services on a two-topic split-queue: **detector-service** (fast
-path, ms-scale -- IForest + split conformal, deterministic, no LLM) publishes
-to Pub/Sub, and **triage-service** (slow path) runs the 5-stage pipeline --
+path, ms-scale -- IForest + split conformal, deterministic, no LLM) scores
+every window and writes it to Firestore, then publishes to Pub/Sub only the
+windows it flags, that is, score at or above the calibrated conformal
+threshold (ADR-016). **triage-service** (slow path) runs the 5-stage pipeline --
 detect, investigate, explain, file_report, route -- as a real ADK 2 `Workflow`
 graph with two Gemini agent nodes and dict-edge routers. The **deterministic
 gate** (`verification_gate`) decides `confirm` / `disputed` / `reject` from
