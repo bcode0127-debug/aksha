@@ -3,14 +3,20 @@
 
 **1. Pipeline (two-topic split-queue)**
 
+Amended by [ADR-016](adr/ADR-016.md): the publish step from detector service
+to the `triage` topic is conditional on the conformal threshold (is_anomalous),
+not unconditional as this diagram originally specified. The Firestore write
+of the DetectionResult happens for every scored window regardless.
+
 ```
 Mission2 fragments (ESA-ADB; see ADR-015)
   → replay loader (publishes in sequence)
   → Pub/Sub topic: telemetry-in  [push]
   → Cloud Run: detector service (fast path, ms-scale)
       detect (IForest + split conformal, deterministic)
-      → persist DetectionResult (Firestore)
+      → persist DetectionResult (Firestore), every scored window
       → ack immediately
+      → [conditional: is_anomalous, i.e. score >= threshold]
       → publish to Pub/Sub topic: triage  [push, ack deadline 600s]
   → Cloud Run: triage service (slow path, ADK graph workflow)
       investigate → assemble_explainer_input → explain → verification_gate

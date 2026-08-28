@@ -2,8 +2,9 @@
 
 Receives a Pub/Sub push envelope on `telemetry-in`, scores the window with the
 committed Isolation Forest + split conformal artifact, writes the
-DetectionResult to Firestore, and republishes it to `triage`. See TRD sections
-1 and 5.
+DetectionResult to Firestore for every scored window, and republishes to
+`triage` only the windows whose score meets or exceeds the conformal
+threshold (is_anomalous). See TRD sections 1 and 5.
 
 The artifact is loaded once at cold start, not per request: it is ~1.8 MB and
 unpickling it on every push would dominate the fast path's latency budget.
@@ -110,6 +111,10 @@ async def handle_push(request: Request) -> Response:
             detection["conformal_p"],
             detection["is_anomalous"],
         )
+
+    if not detection["is_anomalous"]:
+        logger.info("detection %s not anomalous, not publishing to %s", idempotency_key, TRIAGE_TOPIC)
+        return Response(status_code=204)
 
     future = publisher.publish(triage_topic_path, json.dumps(detection).encode("utf-8"))
     # future.result() blocks; run it off the event loop instead of freezing other requests.

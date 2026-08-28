@@ -68,7 +68,7 @@ def main() -> int:
     parser.add_argument("--count", type=int, default=None, help="stop after this many windows")
     parser.add_argument("--duration", type=float, default=None, help="stop after this many seconds")
     parser.add_argument("--topic", default=TOPIC)
-    parser.add_argument("--start-at", type=int, default=0, help="skip this many rows before starting")
+    parser.add_argument("--start-index", type=int, default=0, help="skip this many rows before starting")
     args = parser.parse_args()
 
     test = load_test_windows()
@@ -86,7 +86,7 @@ def main() -> int:
     print("stop with Ctrl+C")
 
     try:
-        i = args.start_at
+        i = args.start_index
         while i < len(test):
             if args.count is not None and published >= args.count:
                 break
