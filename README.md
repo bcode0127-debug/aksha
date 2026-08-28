@@ -109,11 +109,32 @@ scripts/deploy_triage.sh [PROJECT_ID] [RUN_REGION]
 ```
 
 **Dashboard** -- read-only telemetry-triage console over live Firestore state:
-the flagged channel's raw signal, a calibrated threshold-overlay decision
-panel, and a clickable incident strip. Run locally with ADC:
+a funnel strip (windows built, scored, flagged, triaged), the flagged
+channel's raw signal, a calibrated threshold-overlay decision panel, the full
+agent trace, and a clickable incident strip.
+
+Public, no credentials needed: **https://dashboard-895195973069.us-central1.run.app**
+(Cloud Run, `min-instances=0`, `aksha-dashboard-reader` service account --
+`roles/datastore.viewer` only, no write path anywhere in the dashboard's
+code). Redeploy after new incidents land, so the shipped signal cache stays
+current:
+```
+python3 scripts/precompute_signal_cache.py
+python3 scripts/build_funnel_stats.py        # only if the detector or Mission2 build changed
+scripts/deploy_dashboard.sh [PROJECT_ID] [REGION]
+```
+
+Run locally with ADC instead:
 ```
 python3 scripts/precompute_signal_cache.py   # once, or after new incidents land
 streamlit run aksha_agent/dashboard/app.py
+```
+
+Replay real Mission2 test-split windows through the live pipeline at a fixed
+rate, so the strip grows unattended (STEP 6/7 of the packet that added this):
+```
+python3 scripts/replay_loader.py             # every 5s, until Ctrl+C
+python3 scripts/replay_loader.py --rate 10 --duration 300   # bounded run
 ```
 
 ## Repository layout

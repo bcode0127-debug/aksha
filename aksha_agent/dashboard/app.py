@@ -39,6 +39,46 @@ PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "aksha-hackathon")
 INCIDENT_LIMIT = 50
 SIGNAL_CACHE_PATH = REPO_ROOT / "data" / "processed" / "dashboard_signal_cache.parquet"
 FINAL_REPORT_PATH = REPO_ROOT / "eval" / "outputs" / "final_report.json"
+FUNNEL_STATS_PATH = REPO_ROOT / "aksha_core" / "artifacts" / "mission2_funnel_stats.json"
+
+# Human-readable labels for the real graph node names that appear in
+# traces/{id}/steps/{n} -- see aksha_agent/graph/workflow.py. Two entries are
+# deliberately dual-labelled: investigate and explain are LlmAgent nodes with
+# no trace step of their own (ADK has no node-level callback for agent nodes,
+# ADR-013 spike; aksha_agent/graph/workflow.py's trace() calls are only in
+# function nodes), so their real output is stored in the FOLLOWING function
+# node's trace payload. The label says so rather than pretending there is a
+# separate stored step.
+NODE_LABELS: dict[str, dict] = {
+    "prepare_context": {
+        "title": "1. Prepare context", "model": False,
+        "what": "Loaded the channel's reference history and nearest labeled neighbors.",
+    },
+    "assemble_explainer_input": {
+        "title": "2. Investigate -> 3. Assemble explainer input", "model": True,
+        "what": "Gemini investigated (hypothesis, implicated channel, evidence), then the "
+                "result was packaged for the explainer. investigate has no trace step of its "
+                "own (ADR-013): its output is stored in this step's payload.",
+    },
+    "verification_gate": {
+        "title": "4. Explain -> 5. Verification gate", "model": True,
+        "what": "Gemini explained the window in operator language (audit only), then the "
+                "deterministic gate compared the calibrated distance against the threshold "
+                "and band. explain has no trace step of its own, same reason as investigate.",
+    },
+    "route_by_status": {
+        "title": "6. Route: by gate verdict", "model": False,
+        "what": "Routed on the gate's verdict alone -- confirm, disputed, or reject.",
+    },
+    "file_report": {"title": "6. Route: file report", "model": False, "what": "Filed the incident, computed severity from conformal_p."},
+    "file_report_rejected": {"title": "6. Route: file report (rejected)", "model": False, "what": "Filed the incident as expected operation -- logged, not escalated."},
+    "file_report_disputed": {"title": "6. Route: file report (disputed)", "model": False, "what": "Filed the incident as disputed -- logged, not escalated."},
+    "file_report_unroutable": {"title": "6. Route: file report (unroutable)", "model": False, "what": "Gate emitted a verdict no branch claimed (DEFAULT_ROUTE) -- filed and flagged anyway."},
+    "notify_flight_director": {"title": "6. Route: deliver", "model": False, "what": "Delivered to the flight director via the slack-flight-director webhook."},
+    "notify_subsystem_engineer": {"title": "6. Route: deliver", "model": False, "what": "Delivered to the subsystem engineer via the slack-subsystem webhook."},
+    "record_to_log": {"title": "6. Route: deliver", "model": False, "what": "Recorded to the log channel via the slack-log webhook."},
+    "record_unroutable": {"title": "6. Route: deliver", "model": False, "what": "Severity router's DEFAULT_ROUTE -- recorded to the log channel anyway."},
+}
 
 BG = "#0E1117"
 FG = "#E8E8E8"
@@ -95,11 +135,40 @@ def load_trace(incident_id: str) -> list[dict]:
     return [d.to_dict() for d in query.stream()]
 
 
-@st.cache_data
+@st.cache_data(ttl=30)
 def load_signal_cache() -> pd.DataFrame | None:
     if not SIGNAL_CACHE_PATH.exists():
         return None
     return pd.read_parquet(SIGNAL_CACHE_PATH)
+
+
+@st.cache_data
+def load_funnel_stats() -> dict | None:
+    """The funnel strip's three static numbers, precomputed by
+    scripts/build_funnel_stats.py from the real Mission2 adapter output and
+    the committed detector -- not read fresh on every page load (that would
+    mean shipping the 27 MB feature parquet into the deploy image and
+    rescoring 168k rows per request for a number that never changes on a
+    given commit). Returns None if the artifact is missing, in which case
+    the caller omits those metrics rather than guessing.
+    """
+    if not FUNNEL_STATS_PATH.exists():
+        return None
+    return json.loads(FUNNEL_STATS_PATH.read_text())
+
+
+@st.cache_data(ttl=30)
+def count_incidents() -> int | None:
+    """Total incidents ever triaged, live from Firestore -- a count()
+    aggregation query, not len(load_incidents()) (which is capped at
+    INCIDENT_LIMIT and would undercount once more than 50 incidents exist).
+    """
+    try:
+        db = get_client()
+        result = db.collection("incidents").count().get()
+        return int(result[0][0].value)
+    except Exception:
+        return None
 
 
 def load_evidence() -> dict:
@@ -140,6 +209,24 @@ def inject_css() -> None:
         .aksha-audit {
             color: #8A8A8A; font-size: 0.9em; font-style: italic; margin-top: 0.4em;
         }
+        .aksha-funnel-num {
+            font-size: 2.0em; font-weight: 700; color: #E8E8E8; line-height: 1.1;
+        }
+        .aksha-funnel-label {
+            color: #8A8A8A; font-size: 0.85em; margin-top: 0.15em;
+        }
+        .aksha-trace-card {
+            background-color: #161A22; border: 1px solid #2A2E37; border-left: 3px solid #4FA3FF;
+            border-radius: 6px; padding: 0.6em 0.9em; margin-bottom: 0.5em;
+        }
+        .aksha-trace-title { font-weight: 700; font-size: 1.0em; }
+        .aksha-trace-model {
+            display: inline-block; background-color: #2A3F55; color: #9CC7F0; border-radius: 999px;
+            padding: 0.05em 0.55em; font-size: 0.75em; margin-left: 0.5em; font-weight: 600;
+        }
+        .aksha-trace-what { color: #C7C7C7; font-size: 0.9em; margin-top: 0.2em; }
+        .aksha-trace-elapsed { color: #8A8A8A; font-size: 0.8em; margin-top: 0.2em; }
+        .aksha-trace-detail { color: #E8E8E8; font-size: 0.88em; margin-top: 0.35em; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -162,6 +249,45 @@ def _dark_axes(ax) -> None:
     ax.grid(color=GRID, linewidth=0.5, alpha=0.6)
 
 
+# --- Funnel strip -------------------------------------------------------
+
+def render_funnel_strip() -> None:
+    """Four numbers, each read from a real artifact -- never hardcoded. The
+    first three are precomputed static facts about the offline build
+    (scripts/build_funnel_stats.py); the fourth is a live Firestore count.
+    Any number whose source is unavailable is omitted, not estimated.
+    """
+    stats = load_funnel_stats()
+    incidents_total = count_incidents()
+
+    cols = st.columns(4)
+    cells = [
+        ("Windows built", stats.get("windows_built") if stats else None,
+         stats.get("windows_built_note", "") if stats else ""),
+        ("Windows in test split", stats.get("windows_test") if stats else None,
+         stats.get("windows_test_note", "") if stats else ""),
+        ("Windows flagged", stats.get("windows_flagged") if stats else None,
+         stats.get("windows_flagged_note", "") if stats else ""),
+        ("Incidents triaged", incidents_total,
+         "live count() on Firestore incidents/"),
+    ]
+    for col, (label, value, source) in zip(cols, cells):
+        with col:
+            if value is None:
+                st.markdown(
+                    f'<div class="aksha-funnel-num" style="color:#555;">n/a</div>'
+                    f'<div class="aksha-funnel-label">{label} -- source unavailable, omitted</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="aksha-funnel-num">{value:,}</div>'
+                    f'<div class="aksha-funnel-label">{label}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption(source)
+
+
 # --- Pane 1: Signal ---------------------------------------------------------
 
 def render_signal_pane(incident: dict) -> None:
@@ -174,15 +300,23 @@ def render_signal_pane(incident: dict) -> None:
     incident_id = incident["_id"]
     sub = cache[cache["incident_id"] == incident_id] if cache is not None else pd.DataFrame()
 
+    # A dedicated container, rendered into fresh on every call, so a switch
+    # between the fallback message and the plot (different element types at
+    # the same position) is always a hard replace. Without this, a fragment
+    # rerun (the 30s timer or a Load click) can leave the previous incident's
+    # chart or fallback showing under the new one until a full page reload.
+    pane = st.empty()
+
     if sub.empty:
-        st.markdown(
-            '<div style="background:#1A1D23; border:1px dashed #444; border-radius:8px; '
-            'padding:2.5em; text-align:center; color:#8A8A8A;">'
-            "No cached signal data for this incident.<br>"
-            "<code>python3 scripts/precompute_signal_cache.py</code> to include it."
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        with pane.container():
+            st.markdown(
+                '<div style="background:#1A1D23; border:1px dashed #444; border-radius:8px; '
+                'padding:2.5em; text-align:center; color:#8A8A8A;">'
+                "No cached signal data for this incident.<br>"
+                "<code>python3 scripts/precompute_signal_cache.py</code> to include it."
+                "</div>",
+                unsafe_allow_html=True,
+            )
         return
 
     flagged = sub[sub["is_flagged"]]
@@ -204,13 +338,14 @@ def render_signal_pane(incident: dict) -> None:
 
     ax.set_ylabel("value")
     fig.autofmt_xdate(rotation=20)
-    st.pyplot(fig, clear_figure=True)
+    with pane.container():
+        st.pyplot(fig, clear_figure=True)
+        st.caption(
+            f"Bold blue: {channel} (flagged). Faint gray: the other "
+            f"{others['channel_id'].nunique() if not others.empty else 0} lightweight channels, for context. "
+            "Shaded band: the incident window."
+        )
     plt.close(fig)
-    st.caption(
-        f"Bold blue: {channel} (flagged). Faint gray: the other "
-        f"{others['channel_id'].nunique() if not others.empty else 0} lightweight channels, for context. "
-        "Shaded band: the incident window."
-    )
 
 
 # --- Pane 2: Decision --------------------------------------------------------
@@ -294,6 +429,103 @@ def render_decision_pane(incident: dict) -> None:
         )
 
 
+# --- Agent trace panel --------------------------------------------------
+
+def _fmt_elapsed(prev_ts: str | None, ts: str | None) -> str | None:
+    if not prev_ts or not ts:
+        return None
+    try:
+        prev = pd.Timestamp(prev_ts)
+        cur = pd.Timestamp(ts)
+        return f"+{(cur - prev).total_seconds():.2f}s"
+    except (ValueError, TypeError):
+        return None
+
+
+def render_trace_card(step: dict, elapsed: str | None) -> None:
+    node = step.get("node", "?")
+    label = NODE_LABELS.get(node, {"title": node, "model": False, "what": ""})
+    model_badge = '<span class="aksha-trace-model">model call</span>' if label["model"] else ""
+
+    detail_lines: list[str] = []
+    if node == "prepare_context":
+        detail_lines.append(
+            f"reference_windows={step.get('reference_windows')} &middot; "
+            f"nearest_labeled={step.get('nearest_labeled')} &middot; "
+            f"conformal_p={step.get('conformal_p')}"
+        )
+    elif node == "assemble_explainer_input":
+        refs = ", ".join(step.get("evidence_refs") or []) or "none"
+        detail_lines.append(
+            f"<b>hypothesis:</b> {step.get('hypothesis')} &middot; "
+            f"<b>implicated channel:</b> {step.get('implicated_channel')} &middot; "
+            f"<b>confidence:</b> {step.get('investigator_confidence')}"
+        )
+        detail_lines.append(f"<b>evidence cited:</b> {refs}")
+        detail_lines.append(
+            f"recognition_distance={step.get('recognition_distance')} "
+            f"(percentile {step.get('recognition_percentile')})"
+        )
+    elif node == "verification_gate":
+        detail_lines.append(
+            f"<b>gate:</b> {step.get('gate_verdict')} at distance {step.get('gate_distance')} "
+            f"vs. threshold {step.get('gate_threshold')}, band [{step.get('band_low')}, {step.get('band_high')}]"
+        )
+        detail_lines.append(f"<b>model verdict (audit only):</b> {step.get('llm_verdict')}")
+        if step.get("llm_reason"):
+            detail_lines.append(f"<b>explainer reason:</b> {step['llm_reason']}")
+    elif node == "route_by_status":
+        detail_lines.append(f"route={step.get('route')} &middot; routing_anomaly={step.get('routing_anomaly')}")
+    elif node.startswith("file_report"):
+        detail_lines.append(f"severity={step.get('severity')} &middot; log_only={step.get('log_only')}")
+    else:
+        detail_lines.append(
+            f"delivered={step.get('delivered')} &middot; outcome={step.get('routing_outcome')} "
+            f"&middot; destination={step.get('routing_destination')}"
+        )
+
+    elapsed_html = f'<div class="aksha-trace-elapsed">{elapsed} since previous step</div>' if elapsed else ""
+    st.markdown(
+        f'<div class="aksha-trace-card">'
+        f'<span class="aksha-trace-title">{label["title"]}</span>{model_badge}'
+        f'<div class="aksha-trace-what">{label["what"]}</div>'
+        f'<div class="aksha-trace-detail">{"<br>".join(detail_lines)}</div>'
+        f'{elapsed_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_trace_panel(incident: dict) -> None:
+    st.markdown('<div class="aksha-pane-title">Agent trace</div>', unsafe_allow_html=True)
+
+    steps = load_trace(incident["_id"])
+    if not steps:
+        st.caption("No trace steps found for this incident.")
+        return
+
+    prev_ts = None
+    for step in steps:
+        ts = step.get("timestamp_utc")
+        render_trace_card(step, _fmt_elapsed(prev_ts, ts))
+        prev_ts = ts
+
+    usage = incident.get("token_usage") or {}
+    total_tokens = usage.get("total_tokens")
+    thought_tokens = usage.get("thought_tokens")
+    triage_seconds = incident.get("triage_seconds")
+    llm_calls = incident.get("llm_calls")
+    cost_bits = []
+    if total_tokens is not None:
+        cost_bits.append(f"{total_tokens:,} tokens" + (f" ({thought_tokens:,} thinking)" if thought_tokens else ""))
+    if llm_calls is not None:
+        cost_bits.append(f"{llm_calls} model calls")
+    if triage_seconds is not None:
+        cost_bits.append(f"{triage_seconds:.2f}s wall time")
+    if cost_bits:
+        st.caption("Cost and latency (stored on the incident doc): " + " · ".join(cost_bits))
+
+
 # --- Pane 3: Incident strip --------------------------------------------------
 
 def render_incident_strip(incidents: list[dict], selected_id: str | None) -> None:
@@ -357,6 +589,9 @@ def render_body() -> None:
         selected = next((i for i in incidents if i.get("gate_verdict") is not None), incidents[0])
         st.session_state["selected_incident"] = selected["_id"]
 
+    render_funnel_strip()
+    st.divider()
+
     top_left, top_right = st.columns([65, 35])
     with top_left:
         if selected:
@@ -368,6 +603,10 @@ def render_body() -> None:
             render_decision_pane(selected)
 
     st.divider()
+    if selected:
+        render_trace_panel(selected)
+        st.divider()
+
     render_incident_strip(incidents, selected["_id"] if selected else None)
     render_evidence_strip()
 

@@ -1,0 +1,10 @@
+{
+  "source": "scripts/build_funnel_stats.py, from data/processed/mission2_features.parquet and aksha_core/artifacts/mission2_iforest.joblib",
+  "detector_version": "iforest-conformal-0.1.0",
+  "windows_built": 329615,
+  "windows_built_note": "total rows in the Mission2 adapter's committed feature table (train + calibration + test, purged split)",
+  "windows_test": 168410,
+  "windows_test_note": "test-split rows, scored live by the committed detector",
+  "windows_flagged": 5217,
+  "windows_flagged_note": "test-split rows with score >= the epsilon=0.01 conformal threshold"
+}
